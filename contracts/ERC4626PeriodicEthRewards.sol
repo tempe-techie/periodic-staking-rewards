@@ -5,13 +5,12 @@
 pragma solidity ^0.8.17;
 
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { ERC20Burnable } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 /// @title ERC-4626 compatible staking contract with ETH rewards
 /// @author Tempe Techie
 /// @notice Since this contract issues only ETH as rewards, the staking token (asset) and the receipt token (share) are always in the 1:1 ratio
-contract ERC4626PeriodicEthRewards is ERC20, ERC20Burnable, Ownable {
+contract ERC4626PeriodicEthRewards is ERC20, Ownable {
   address public asset; // staked token address
   
   uint256 public claimRewardsTotal; // total ETH rewards that can be claimed for the previous period

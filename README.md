@@ -7,4 +7,5 @@ An ERC-4626 compatible smart contract vault that issues ETH rewards to stakers. 
 TODO:
 - Name and Symbol dynamically set through constructor
 - An minimum amount of ETH for rewards to be issued in the previous period
+- Owner can remove ETH from the contract (debatable, although ownership can be renounced)
 - Tests
