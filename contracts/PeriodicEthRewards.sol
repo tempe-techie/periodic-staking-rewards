@@ -92,7 +92,7 @@ contract PeriodicEthRewards is ERC20, Ownable {
   }
 
   function previewClaim(address claimer) public view returns (uint256) {
-    if (lastClaimed[claimer] < lastClaimPeriod) {
+    if (lastClaimed[claimer] < lastClaimPeriod && totalSupply() > 0) {
       return claimRewardsTotal * balanceOf(claimer) / totalSupply(); // get ETH claim for a given user
     }
 
