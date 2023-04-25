@@ -2,6 +2,8 @@
 pragma solidity ^0.8.17;
 
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { IERC1155 } from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
+import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 /// @title Staking contract with periodic ETH rewards
@@ -39,9 +41,11 @@ contract PeriodicEthRewards is ERC20, Ownable {
     uint256 _periodLength
   ) ERC20(_receiptTokenName, _receiptTokenSymbol) {
     asset = _asset;
+    
     claimRewardsMinimum = _claimRewardsMinimum;
     minUserDeposit = _minUserDeposit;
     periodLength = _periodLength;
+
     lastClaimPeriod = block.timestamp;
   }
 
@@ -112,11 +116,11 @@ contract PeriodicEthRewards is ERC20, Ownable {
   }
 
   function _claim(address claimer) internal returns (uint256 ethToClaim) {
-    // if the claimer has not claimed yet, claim for them
+    // check if claimer has any ETH (left) to claim
     ethToClaim = previewClaim(claimer);
 
     if (ethToClaim > 0) {
-      // send ETH to the claimer (use .call() to avoid reverts)
+      // send ETH to the claimer
       (bool success, ) = payable(claimer).call{value: ethToClaim}("");
       require(success, "ETH transfer failed");
 
@@ -146,7 +150,7 @@ contract PeriodicEthRewards is ERC20, Ownable {
 
   // RECEIVE (receive ETH)
   receive() external payable {
-    // the line below must be before _updateLastClaimPeriod() because claimRewardsTotal is then set to current balance
+    // futureRewards update must happen before _updateLastClaimPeriod() because claimRewardsTotal is then set to current balance
     futureRewards += msg.value;
 
     _updateLastClaimPeriod();
@@ -154,15 +158,18 @@ contract PeriodicEthRewards is ERC20, Ownable {
 
   // WRITE
 
+  /// @notice Claim ETH rewards for yourself.
   function claimRewards() public returns (uint256) {
     return _claim(_msgSender()); // returns the amount of ETH claimed
   }
 
+  /// @notice Claim ETH rewards for someone else.
   function claimRewardsFor(address claimer) public returns (uint256) {
     return _claim(claimer); // returns the amount of ETH claimed
   }
 
-  function deposit(uint256 assets, address receiver) public returns (uint256 shares) {
+  /// @notice Deposit assets and mint receipt tokens.
+  function deposit(uint256 assets, address receiver) public returns (uint256) {
     require(assets <= maxDeposit(receiver), "PeriodicEthRewards: deposit more than max");
     require(assets >= minUserDeposit, "PeriodicEthRewards: deposit less than min");
 
@@ -176,11 +183,12 @@ contract PeriodicEthRewards is ERC20, Ownable {
     return assets;
   }
 
-  function withdraw(uint256 assets, address receiver, address owner) public returns (uint256 shares) {
+  /// @notice Withdraw assets and burn receipt tokens.
+  function withdraw(uint256 assets, address receiver, address owner) public returns (uint256) {
     require(assets <= maxWithdraw(owner), "PeriodicEthRewards: withdraw more than max");
     require(block.timestamp > (lastDeposit[owner] + periodLength), "PeriodicEthRewards: assets are still locked");
 
-    // if not full withdraw require balance to stay at least the min user deposit amount
+    // if not full withdraw, require balance to stay at least the min user deposit amount
     if (balanceOf(owner) > assets) {
       require((balanceOf(owner) - assets) >= minUserDeposit, "PeriodicEthRewards: the remained balance must be at least the min deposit amount");
     }
@@ -200,6 +208,24 @@ contract PeriodicEthRewards is ERC20, Ownable {
   }
 
   // OWNER
+
+  /// @notice Recover any ERC-20 token mistakenly sent to this contract address (except the staking and receipt tokens)
+  function recoverERC20(address tokenAddress_, uint256 tokenAmount_, address recipient_) external onlyOwner {
+    require(tokenAddress_ != asset, "PeriodicEthRewards: cannot recover staking token");
+    require(tokenAddress_ != address(this), "PeriodicEthRewards: cannot recover receipt token");
+
+    ERC20(tokenAddress_).transfer(recipient_, tokenAmount_);
+  }
+
+  /// @notice Recover any ERC-721 token mistakenly sent to this contract address
+  function recoverERC721(address tokenAddress_, uint256 tokenId_, address recipient_) external onlyOwner {
+    IERC721(tokenAddress_).transferFrom(address(this), recipient_, tokenId_);
+  }
+
+  /// @notice Recover any ERC-1155 token mistakenly sent to this contract address
+  function recoverERC1155(address tokenAddress_, uint256 tokenId_, address recipient_, uint256 _amount) external onlyOwner {
+    IERC1155(tokenAddress_).safeTransferFrom(address(this), recipient_, tokenId_, _amount, "");
+  }
 
   /** 
   @notice 
