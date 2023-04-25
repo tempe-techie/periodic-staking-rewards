@@ -1,6 +1,3 @@
-// TODO (maybe):
-// - there should be a minimum amount of total ETH rewards that can be claimed. If lower than that, no one can claim in that period.
-
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.17;
 
