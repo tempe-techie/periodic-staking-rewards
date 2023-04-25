@@ -136,11 +136,11 @@ contract PeriodicEthRewards is ERC20, Ownable {
       if (address(this).balance >= claimRewardsMinimum) {
         // if the minimum is reached, claimRewardsTotal is set to the current balance
         claimRewardsTotal = address(this).balance;
+        futureRewards = 0; // reset future rewards to 0
       } else {
         claimRewardsTotal = 0; // if the minimum is not reached, no one can claim and all ETH rewards roll over into the next period
+        futureRewards = address(this).balance; // set future rewards to the current balance
       } 
-
-      futureRewards = 0; // reset future rewards to 0
     }
   }
 
