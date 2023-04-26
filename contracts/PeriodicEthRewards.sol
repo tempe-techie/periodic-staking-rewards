@@ -124,12 +124,12 @@ contract PeriodicEthRewards is ERC20, Ownable {
     ethToClaim = previewClaim(claimer);
 
     if (ethToClaim > 0) {
+      // update lastClaimed
+      lastClaimed[claimer] = block.timestamp;
+
       // send ETH to the claimer
       (bool success, ) = payable(claimer).call{value: ethToClaim}("");
       require(success, "ETH transfer failed");
-
-      // update lastClaimed
-      lastClaimed[claimer] = block.timestamp;
     }
 
     _updateLastClaimPeriod();

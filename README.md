@@ -15,6 +15,7 @@ TODO:
 - futureClaim view function?
   - function that calculates the future claim for a given user based on futureRewards and user's balanceOf
   - the future claim is not exact, because it may change up or down depending on the futureRewards and other users' deposits/withdrawals
+- reentrancy guard for the _claim function?
 - Tests
 
 ## Potential issues
