@@ -12,6 +12,9 @@ Actions:
 - Withdraw & Claim
 
 TODO:
+- futureClaim view function?
+  - function that calculates the future claim for a given user based on futureRewards and user's balanceOf
+  - the future claim is not exact, because it may change up or down depending on the futureRewards and other users' deposits/withdrawals
 - Tests
 
 ## Potential issues
@@ -27,7 +30,13 @@ TODO:
 Proposed change of the `deposit` function:
 
 ```solidity
-function deposit(uint256 assets)
+function deposit(uint256 assets, address receiver) external returns (uint256)
+```
+
+In that case would could also change the `withdraw` function and allow msg sender to withdraw only for themselves:
+
+```solidity
+function withdraw(uint256 assets) external returns (uint256)
 ```
 
 ## Use at your own risk

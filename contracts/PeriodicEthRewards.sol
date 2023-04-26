@@ -62,6 +62,10 @@ contract PeriodicEthRewards is ERC20, Ownable {
 
   // READ
 
+  // TODO: futureClaim view function?
+  // - function that calculates the future claim for a given user based on futureRewards and user's balanceOf
+  // - the future claim is not exact, because it may change up or down depending on the futureRewards and other users' deposits/withdrawals
+
   /// @notice Returns the amount of time left (in seconds) until the user can withdraw their assets.
   function getLockedTimeLeft(address owner) public view returns (uint256) {
     if (lastDeposit[owner] == 0) {
@@ -231,6 +235,14 @@ contract PeriodicEthRewards is ERC20, Ownable {
   function recoverERC1155(address tokenAddress_, uint256 tokenId_, address recipient_, uint256 _amount) external onlyOwner {
     IERC1155(tokenAddress_).safeTransferFrom(address(this), recipient_, tokenId_, _amount, "");
   }
+
+  /// @notice Recover ETH from contract. This is contentious so it is commented out by default. Uncomment only if you really need it.
+  /*
+  function recoverETH(address recipient_, uint256 _amount) external onlyOwner {
+    (bool success, ) = payable(recipient_).call{value: _amount}("");
+    require(success, "Failed to withdraw ETH from contract");
+  }
+  */
 
   /** 
   @notice 
