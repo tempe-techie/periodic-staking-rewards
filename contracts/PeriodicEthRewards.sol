@@ -132,7 +132,7 @@ contract PeriodicEthRewards is ERC20, Ownable {
   }
 
   function _updateLastClaimPeriod() internal {
-    // only run if period length has passed
+    // only run if the current period has ended (start a new period)
     if (block.timestamp > (lastClaimPeriod + periodLength)) {
       lastClaimPeriod = block.timestamp;
 
@@ -142,7 +142,7 @@ contract PeriodicEthRewards is ERC20, Ownable {
         claimRewardsTotal = address(this).balance;
         futureRewards = 0; // reset future rewards to 0
       } else {
-        claimRewardsTotal = 0; // if the minimum is not reached, no one can claim and all ETH rewards roll over into the next period
+        claimRewardsTotal = 0; // if the minimum is not reached, no one can claim. All ETH rewards roll over into the next period
         futureRewards = address(this).balance; // set future rewards to the current balance
       } 
     }
@@ -181,6 +181,11 @@ contract PeriodicEthRewards is ERC20, Ownable {
     emit Deposit(_msgSender(), receiver, assets);
 
     return assets;
+  }
+
+  /// @notice Manually update the last claim period (if needed). Anyone can call this function.
+  function updateLastClaimPeriod() external {
+    _updateLastClaimPeriod();
   }
 
   /// @notice Withdraw assets and burn receipt tokens.
