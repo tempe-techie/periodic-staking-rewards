@@ -15,7 +15,7 @@ Receipt token holders can claim ETH rewards periodically.
 The contract tries to follow the ERC-4626 standard with function names, but is not fully ERC-4626 compatible.
 */
 contract PeriodicEthRewards is ERC20, Ownable {
-  address public asset; // staked token address
+  address public immutable asset; // staked token address
   
   uint256 public claimRewardsTotal; // total ETH rewards that can be claimed for the previous period
   uint256 public claimRewardsMinimum; // if the minimum is not reached, no one can claim and all ETH rewards roll over into the next period
@@ -26,7 +26,7 @@ contract PeriodicEthRewards is ERC20, Ownable {
   uint256 public maxUserDeposit = type(uint256).max; // maximum amount of tokens that can be deposited by a user (in wei)
   uint256 public minUserDeposit; // minimum amount of tokens that can be deposited by a user (in wei)
 
-  uint256 immutable public periodLength; // length of the claim period (in seconds), the most common is 1 week (604800 seconds)
+  uint256 public immutable periodLength; // length of the claim period (in seconds), the most common is 1 week (604800 seconds)
 
   mapping (address => uint256) public lastClaimed; // timestamp of the last claim for each user
   mapping (address => uint256) public lastDeposit; // timestamp of the last deposit for each user
@@ -67,7 +67,7 @@ contract PeriodicEthRewards is ERC20, Ownable {
   // - the future claim is not exact, because it may change up or down depending on the futureRewards and other users' deposits/withdrawals
 
   /// @notice Returns the amount of time left (in seconds) until the user can withdraw their assets.
-  function getLockedTimeLeft(address owner) public view returns (uint256) {
+  function getLockedTimeLeft(address owner) external view returns (uint256) {
     if (lastDeposit[owner] == 0) {
       return 0;
     }
@@ -163,17 +163,17 @@ contract PeriodicEthRewards is ERC20, Ownable {
   // WRITE
 
   /// @notice Claim ETH rewards for yourself.
-  function claimRewards() public returns (uint256) {
+  function claimRewards() external returns (uint256) {
     return _claim(_msgSender()); // returns the amount of ETH claimed
   }
 
   /// @notice Claim ETH rewards for someone else.
-  function claimRewardsFor(address claimer) public returns (uint256) {
+  function claimRewardsFor(address claimer) external returns (uint256) {
     return _claim(claimer); // returns the amount of ETH claimed
   }
 
   /// @notice Deposit assets and mint receipt tokens.
-  function deposit(uint256 assets, address receiver) public returns (uint256) {
+  function deposit(uint256 assets, address receiver) external returns (uint256) {
     require(assets <= maxDeposit(receiver), "PeriodicEthRewards: deposit more than max");
     require(assets >= minUserDeposit, "PeriodicEthRewards: deposit less than min");
 
@@ -193,7 +193,7 @@ contract PeriodicEthRewards is ERC20, Ownable {
   }
 
   /// @notice Withdraw assets and burn receipt tokens.
-  function withdraw(uint256 assets, address receiver, address owner) public returns (uint256) {
+  function withdraw(uint256 assets, address receiver, address owner) external returns (uint256) {
     require(assets <= maxWithdraw(owner), "PeriodicEthRewards: withdraw more than max");
     require(block.timestamp > (lastDeposit[owner] + periodLength), "PeriodicEthRewards: assets are still locked");
 
@@ -249,17 +249,17 @@ contract PeriodicEthRewards is ERC20, Ownable {
   Sets the minimum amount of ETH that must be in the contract for rewards to be distributed.
   If minimum is not met, rewards roll over into the next period.
   */
-  function setClaimRewardsMinimum(uint256 _claimRewardsMinimum) public onlyOwner {
+  function setClaimRewardsMinimum(uint256 _claimRewardsMinimum) external onlyOwner {
     claimRewardsMinimum = _claimRewardsMinimum;
   }
 
   /// @notice Sets the maximum amount of assets that a user can deposit at once.
-  function setMaxUserDeposit(uint256 _maxUserDeposit) public onlyOwner {
+  function setMaxUserDeposit(uint256 _maxUserDeposit) external onlyOwner {
     maxUserDeposit = _maxUserDeposit;
   }
 
   /// @notice Sets the minimum amount of assets that a user can deposit.
-  function setMinUserDeposit(uint256 _minUserDeposit) public onlyOwner {
+  function setMinUserDeposit(uint256 _minUserDeposit) external onlyOwner {
     minUserDeposit = _minUserDeposit;
   }
 
