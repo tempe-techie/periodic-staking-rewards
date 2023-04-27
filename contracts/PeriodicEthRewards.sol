@@ -100,6 +100,10 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
 
     if (to != address(0)) {
       _claim(to);
+      // in case the receiver had no previous claims, set lastClaimed to the current timestamp
+      // this prevents double claiming of rewards, because the sender should have gotten all 
+      // the rewards from the current claim period
+      lastClaimed[to] = block.timestamp;
     }
   }
 

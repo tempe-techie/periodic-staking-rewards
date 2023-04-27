@@ -239,6 +239,85 @@ describe("PeriodicEthRewards", function () {
   });
 
   // Scenario 3: user sends receipt tokens to another address. What happens to the rewards? (both addresses try to claim rewards)
+  it("Scenario 3: user sends receipt tokens to another address. What happens to the rewards? (both addresses try to claim rewards)", async function() {
+    // check user1 and user2 staking token balance
+    expect(await stakingTokenContract.balanceOf(user1.address)).to.equal(user1stakingTokenBalance);
+    expect(await stakingTokenContract.balanceOf(user2.address)).to.equal(user2stakingTokenBalance);
+
+    const user1tokensToDeposit = ethers.utils.parseEther("300");
+
+    // user1 deposits 100 tokens
+    await stakingTokenContract.connect(user1).approve(rewardsContract.address, user1tokensToDeposit);
+    await rewardsContract.connect(user1).deposit(user1tokensToDeposit);
+
+    // user1 should have 0 rewards
+    expect(await rewardsContract.connect(user1).previewClaim(user1.address)).to.equal(0);
+
+    // user2 should have 0 rewards
+    expect(await rewardsContract.connect(user2).previewClaim(user2.address)).to.equal(0);
+
+    // check rewards contract balance
+    expect(await ethers.provider.getBalance(rewardsContract.address)).to.equal(0);
+
+    // send 9 ETH to the rewards contract
+    await owner.sendTransaction({ 
+      value: ethers.utils.parseEther("9"),
+      to: rewardsContract.address 
+    });
+
+    // check rewards contract balance
+    expect(await ethers.provider.getBalance(rewardsContract.address)).to.equal(ethers.utils.parseEther("9"))
+
+    // advance time by 1 week
+    await ethers.provider.send("evm_increaseTime", [604801]); // 1 week + 1 second
+    await ethers.provider.send("evm_mine");
+
+    // send 1 more ETH to the rewards contract to trigger _updateLastClaimPeriod
+    // this ETH will be added to the rewards pool for the previous claim period, so 10 ETH in total (9 ETH + 1 ETH)
+    await owner.sendTransaction({ 
+      value: ethers.utils.parseEther("1"),
+      to: rewardsContract.address 
+    });
+
+    // check rewards contract balance
+    expect(await ethers.provider.getBalance(rewardsContract.address)).to.equal(ethers.utils.parseEther("10"));
+
+    // user1: check receipt token balance
+    expect(await rewardsContract.balanceOf(user1.address)).to.equal(user1tokensToDeposit);
+
+    // user2: check receipt token balance
+    expect(await rewardsContract.balanceOf(user2.address)).to.equal(0);
+
+    // user1: preview shows 100% of the rewards
+    expect(await rewardsContract.connect(user1).previewClaim(user1.address)).to.equal(ethers.utils.parseEther("10"));
+
+    // user2: preview shows 0% of the rewards
+    expect(await rewardsContract.connect(user2).previewClaim(user2.address)).to.equal(0);
+
+    // user1: get ETH balance before transfer
+    const user1BalanceBefore = await ethers.provider.getBalance(user1.address);
+    console.log("user1BalanceBefore: ", ethers.utils.formatEther(user1BalanceBefore));
+
+    // user1 transfer 150 tokens to user2
+    await rewardsContract.connect(user1).transfer(user2.address, ethers.utils.parseEther("150"));
+
+    // user1: check receipt token balance
+    expect(await rewardsContract.balanceOf(user1.address)).to.equal(user1tokensToDeposit.div(2));
+
+    // user2: check receipt token balance
+    expect(await rewardsContract.balanceOf(user2.address)).to.equal(user1tokensToDeposit.div(2));
+
+    // user1: preview shows 0% of the rewards because when the user transferred the tokens, the rewards were automatically claimed
+    expect(await rewardsContract.connect(user1).previewClaim(user1.address)).to.equal(0);
+
+    // user1: get ETH balance after transfer
+    const user1BalanceAfter = await ethers.provider.getBalance(user1.address);
+    console.log("user1BalanceAfter: ", ethers.utils.formatEther(user1BalanceAfter));
+    console.log("Difference", ethers.utils.formatEther(user1BalanceAfter.sub(user1BalanceBefore))); // should be approx. the same as the rewards amount (minus gas)
+
+    // user2: preview shows 0% of the rewards, because user2 did not have any staked tokens before the transfer
+    expect(await rewardsContract.connect(user2).previewClaim(user2.address)).to.equal(0);
+  });
 
   // Scenario 4: minUserDeposit is set to 1 wei, claimRewardsMinimum is set to 0.0001 ETH. User1 deposits 1 wei, user2 deposits 10 ETH. The reward is 0.001 ETH. How much does each user get?
 
