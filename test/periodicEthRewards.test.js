@@ -319,11 +319,88 @@ describe("PeriodicEthRewards", function () {
     expect(await rewardsContract.connect(user2).previewClaim(user2.address)).to.equal(0);
   });
 
-  // Scenario 4: minUserDeposit is set to 1 wei, claimRewardsMinimum is set to 0.0001 ETH. User1 deposits 1 wei, user2 deposits 10 ETH. The reward is 0.001 ETH. How much does each user get?
+  // Scenario 4: Deposited tokens balances are too far away from each other. How does this affect the rewards calculation?
+  // minUserDeposit is set to 1 wei, claimRewardsMinimum is set to 1 wei. User1 deposits 1 wei tokens, user2 deposits 10 ETH tokens. The reward is 0.001 ETH. How much does each user get?
+  // Conclusion: it seems that user 1 does not get anything, because their balance is just too low. That's why minDeposit and claimRewardsMinimum should be set to a reasonably high amount.
+  it("Scenario 4: Deposited tokens balances are too far away from each other. How does this affect the rewards calculation?", async function() {
+    // check claimRewardsMinimum state before
+    expect(await rewardsContract.claimRewardsMinimum()).to.equal(claimRewardsMinimum);
 
-  // Scenario 5: the asset token has a fee-on-transfer mechanism. How does this affect the totalSupply? Is is the same as the contracts asset balance?
-    // create new describe block
+    // set claimRewardsMinimum to 1
+    await rewardsContract.setClaimRewardsMinimum(1);
+    expect(await rewardsContract.claimRewardsMinimum()).to.equal(1);
 
-  // Scenario 6: the asset token has 10 decimals (instead of 18). Does this affect the rewards calculation? How about withdrawals?
-    // create new describe block
+    // setMinDeposit to 1 wei
+    await rewardsContract.setMinDeposit(1);
+    expect(await rewardsContract.minDeposit()).to.equal(1);
+    
+    // check user1 and user2 staking token balance
+    expect(await stakingTokenContract.balanceOf(user1.address)).to.equal(user1stakingTokenBalance);
+    expect(await stakingTokenContract.balanceOf(user2.address)).to.equal(user2stakingTokenBalance);
+
+    const user1tokensToDeposit = 1; // 1 wei tokens
+    const user2tokensToDeposit = ethers.utils.parseEther("10");
+
+    // user1 deposits 1 wei tokens
+    await stakingTokenContract.connect(user1).approve(rewardsContract.address, user1tokensToDeposit);
+    await rewardsContract.connect(user1).deposit(user1tokensToDeposit);
+
+    // user2 deposits 10 ETH tokens
+    await stakingTokenContract.connect(user2).approve(rewardsContract.address, user2tokensToDeposit);
+    await rewardsContract.connect(user2).deposit(user2tokensToDeposit);
+
+    // check rewards contract balance
+    expect(await ethers.provider.getBalance(rewardsContract.address)).to.equal(0);
+
+    // send 0.0009 ETH to the rewards contract
+    await owner.sendTransaction({ 
+      value: ethers.utils.parseEther("0.0009"),
+      to: rewardsContract.address 
+    });
+
+    // check rewards contract balance
+    expect(await ethers.provider.getBalance(rewardsContract.address)).to.equal(ethers.utils.parseEther("0.0009"));
+
+    // advance time by 1 week
+    await ethers.provider.send("evm_increaseTime", [604801]); // 1 week + 1 second
+    await ethers.provider.send("evm_mine");
+
+    // send 0.0001 more ETH to the rewards contract to trigger _updateLastClaimPeriod
+    // this ETH will be added to the rewards pool for the previous claim period, so 0.001 ETH in total (0.0009 ETH + 0.0001 ETH)
+    await owner.sendTransaction({ 
+      value: ethers.utils.parseEther("0.0001"),
+      to: rewardsContract.address 
+    });
+
+    // check rewards contract balance
+    const rewards = await ethers.provider.getBalance(rewardsContract.address);
+    expect(rewards).to.equal(ethers.utils.parseEther("0.001"));
+    console.log("rewards: ", ethers.utils.formatEther(rewards), "ETH");
+    console.log("rewards: ", Number(rewards), "wei");
+
+    // user1 claim preview
+    const user1claim = await rewardsContract.connect(user1).previewClaim(user1.address);
+    console.log("user1claim: ", Number(user1claim));
+
+    // user2 claim preview
+    const user2claim = await rewardsContract.connect(user2).previewClaim(user2.address);
+    console.log("user2claim: ", ethers.utils.formatEther(user2claim), "ETH");
+    console.log("user2claim: ", Number(user2claim), "wei");
+
+    // preview claim for user3 (should be 0)
+    expect(await rewardsContract.connect(user3).previewClaim(user3.address)).to.equal(0);
+
+    // user1: check receipt token balance
+    //expect(await rewardsContract.balanceOf(user1.address)).to.equal(user1tokensToDeposit);
+
+    // user2: check receipt token balance
+    //expect(await rewardsContract.balanceOf(user2.address)).to.equal(user2tokensToDeposit);
+
+  });
 });
+
+// Scenario 5: the asset token has a fee-on-transfer mechanism. How does this affect the totalSupply? Is is the same as the contracts asset balance?
+  // create new describe block
+
+// Scenario 6: the asset token has 10 decimals (instead of 18). Does this affect the rewards calculation? How about withdrawals?
+  // create new describe block
