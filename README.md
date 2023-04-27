@@ -30,8 +30,10 @@ TODO:
 Proposed change of the `deposit` function:
 
 ```solidity
-function deposit(uint256 assets, address receiver) external returns (uint256)
+function deposit(uint256 assets) external returns (uint256)
 ```
+
+The `receiver` parameter is removed. Sender can only deposit for themselves.
 
 In that case would could also change the `withdraw` function and allow msg sender to withdraw only for themselves:
 
