@@ -48,14 +48,8 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
 
   // EVENTS
 
-  event Deposit(address indexed caller, address indexed owner, uint256 assets);
-
-  event Withdraw(
-      address indexed caller,
-      address indexed receiver,
-      address indexed owner,
-      uint256 assets
-  );
+  event Deposit(address indexed owner, uint256 assets);
+  event Withdraw(address indexed owner, uint256 assets);
 
   // READ
 
@@ -98,7 +92,7 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   function _beforeTokenTransfer(
     address from,
     address to,
-    uint256 amount // solhint-disable-line no-unused-vars
+    uint256 // amount commented out because it is not used
   ) internal virtual override {
     if (from != address(0)) {
       _claim(from);
@@ -164,16 +158,16 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   }
 
   /// @notice Deposit assets and mint receipt tokens.
-  function deposit(uint256 assets, address receiver) external nonReentrant returns (uint256) {
+  function deposit(uint256 assets) external nonReentrant returns (uint256) {
     require(assets <= maxDeposit, "PeriodicEthRewards: deposit more than max");
     require(assets >= minDeposit, "PeriodicEthRewards: deposit less than min");
 
-    lastDeposit[receiver] = block.timestamp; // after deposit withdrawals are disabled for periodLength
+    lastDeposit[_msgSender()] = block.timestamp; // after deposit withdrawals are disabled for periodLength
 
     ERC20(asset).transferFrom(_msgSender(), address(this), assets); // transfer staking tokens to this contract
-    _mint(receiver, assets); // mint receipt tokens
+    _mint(_msgSender(), assets); // mint receipt tokens
 
-    emit Deposit(_msgSender(), receiver, assets);
+    emit Deposit(_msgSender(), assets);
 
     return assets;
   }
@@ -184,29 +178,25 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   }
 
   /// @notice Withdraw assets and burn receipt tokens.
-  function withdraw(uint256 assets, address receiver, address owner) external nonReentrant returns (uint256) {
-    require(assets <= balanceOf(owner), "PeriodicEthRewards: cannot withdraw more than balance");
-    require(block.timestamp > (lastDeposit[owner] + periodLength), "PeriodicEthRewards: assets are still locked");
+  function withdraw(uint256 assets) external nonReentrant returns (uint256) {
+    require(assets <= balanceOf(_msgSender()), "PeriodicEthRewards: cannot withdraw more than balance");
+    require(block.timestamp > (lastDeposit[_msgSender()] + periodLength), "PeriodicEthRewards: assets are still locked");
 
     // if not full withdraw, require balance to stay at least the min user deposit amount
-    if (balanceOf(owner) > assets) {
+    if (balanceOf(_msgSender()) > assets) {
       require(
-        (balanceOf(owner) - assets) >= minDeposit, 
+        (balanceOf(_msgSender()) - assets) >= minDeposit, 
         "PeriodicEthRewards: the remaining balance too low"
       );
     }
 
-    if (_msgSender() != owner) {
-      _spendAllowance(owner, _msgSender(), assets);
-    }
-
-    _burn(owner, assets); // burn receipt tokens
-    ERC20(asset).transfer(receiver, assets); // receive back the asset tokens (staking tokens)
+    _burn(_msgSender(), assets); // burn receipt tokens
+    ERC20(asset).transfer(_msgSender(), assets); // receive back the asset tokens (staking tokens)
 
     // note: if user withdraws all staked tokens, they forfeit their claim for the current 
     // staking period (unless they deposit again)
 
-    emit Withdraw(_msgSender(), receiver, owner, assets);
+    emit Withdraw(_msgSender(), assets);
 
     return assets;
   }

@@ -69,11 +69,11 @@ describe("PeriodicEthRewards", function () {
 
     // user1 deposits 100 tokens
     await stakingTokenContract.connect(user1).approve(rewardsContract.address, user1tokensToDeposit);
-    await rewardsContract.connect(user1).deposit(user1tokensToDeposit, user1.address);
+    await rewardsContract.connect(user1).deposit(user1tokensToDeposit);
 
     // user2 deposits 200 tokens
     await stakingTokenContract.connect(user2).approve(rewardsContract.address, user2tokensToDeposit);
-    await rewardsContract.connect(user2).deposit(user2tokensToDeposit, user2.address);
+    await rewardsContract.connect(user2).deposit(user2tokensToDeposit);
 
     // user1 should have 0 rewards
     expect(await rewardsContract.connect(user1).previewClaim(user1.address)).to.equal(0);

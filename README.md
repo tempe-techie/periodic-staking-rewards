@@ -14,38 +14,29 @@ Actions:
 - Withdraw (& Claim)
 
 TODO:
-- mitigate an asset locking attack
 - Tests
-
-## Potential issues
-
-### Asset locking attack
-
-- When assets are deposited cannot withdraw for another period of time (e.g. 1 week).
-- Because anyone can deposit for anyone (ERC4626-compliant deposit function), this means user1 could prevent user2 from ever withdrawing again by just depositing the minimum amount of assets (minUserDeposit) everytime the user2 wants to initiate a withdrawal.
-- This would require user1 to frontrun user2's withdrawals.
-- It would incur costs to user1. But if minUserDeposit is set very low it could be cheap to do, at least for certain period of time.
-- Solution: Probably to break the ERC4626 compliancy and allow msg senders to deposit only for themselves:
-
-Proposed change of the `deposit` function:
-
-```solidity
-function deposit(uint256 assets) external returns (uint256)
-```
-
-The `receiver` parameter is removed. Sender can only deposit for themselves.
-
-In that case would could also change the `withdraw` function and allow msg sender to withdraw only for themselves:
-
-```solidity
-function withdraw(uint256 assets) external returns (uint256)
-```
 
 ## Limitations
 
 ### Rebasing tokens are not supported
 
 Tokens that intrinsically change balance (without tokens holders doing anything) such as stETH or AMPL are not supported as assets/staking tokens. Please avoid using them.
+
+### No ERC4626 compatibility
+
+At first the contract intended to be ERC-4626 compatible, but then it turned out that the deposit function would allow for an "asset locking attack". The ERC4626 `deposit` function allows depositing funds for any user (`receiver`): 
+
+```solidity
+function deposit(uint256 assets, address receiver) public returns (uint256)
+```
+
+Normally this would be fine, but in our case each deposit triggers a lock of funds for the default period of time, which means someone could prevent another user from withdrawing by depositing a minimum amount of funds in the victim's name.
+
+That's why in this contract the message sender can only deposit or withdraw for themselves, not for anyone else:
+
+```solidity
+function deposit(uint256 assets) external returns (uint256)
+```
 
 ## Use at your own risk
 
