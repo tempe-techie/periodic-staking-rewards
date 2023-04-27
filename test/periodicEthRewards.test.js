@@ -59,11 +59,11 @@ describe("PeriodicEthRewards", function () {
 
   // scenario 1: user1 deposits 300 tokens, user2 deposits 700 tokens
   // user1 should get 30% of the rewards and user2 should get 70% of the rewards after 1 week
-  it("Scenario 1: user1 deposits 300 tokens, user2 deposits 700 tokens. They claim rewards after 1 week.", async function () {
+  it("Scenario 1: User1 deposits 300 tokens, user2 deposits 700 tokens. They claim rewards after 1 week.", async function () {
     const user1tokensToDeposit = ethers.utils.parseEther("300");
     const user2tokensToDeposit = ethers.utils.parseEther("700");
 
-    // check user1 and user2 staking token balance before
+    // check user1 and user2 staking token balance
     expect(await stakingTokenContract.balanceOf(user1.address)).to.equal(user1stakingTokenBalance);
     expect(await stakingTokenContract.balanceOf(user2.address)).to.equal(user2stakingTokenBalance);
 
@@ -81,7 +81,7 @@ describe("PeriodicEthRewards", function () {
     // user2 should have 0 rewards
     expect(await rewardsContract.connect(user2).previewClaim(user2.address)).to.equal(0);
 
-    // check rewards contract balance before
+    // check rewards contract balance
     expect(await ethers.provider.getBalance(rewardsContract.address)).to.equal(0);
 
     // send 9 ETH to the rewards contract
@@ -160,6 +160,63 @@ describe("PeriodicEthRewards", function () {
   });
 
   // Scenario 2: there's a very small amount of ETH in the rewards contract (just 1 wei). claimRewardsMinimum needs to be set to 0.
+  // What happens?
+  it("Scenario 2: There's a very small amount of ETH in the rewards contract (just 1 wei).", async function() {
+    // check claimRewardsMinimum state before
+    expect(await rewardsContract.claimRewardsMinimum()).to.equal(claimRewardsMinimum);
+
+    // set claimRewardsMinimum to 0
+    await rewardsContract.setClaimRewardsMinimum(0);
+
+    // check claimRewardsMinimum state after
+    expect(await rewardsContract.claimRewardsMinimum()).to.equal(0);
+
+    const user1tokensToDeposit = ethers.utils.parseEther("300");
+    const user2tokensToDeposit = ethers.utils.parseEther("700");
+
+    // check user1 and user2 staking token balance before
+    expect(await stakingTokenContract.balanceOf(user1.address)).to.equal(user1stakingTokenBalance);
+    expect(await stakingTokenContract.balanceOf(user2.address)).to.equal(user2stakingTokenBalance);
+
+    // user1 deposits 100 tokens
+    await stakingTokenContract.connect(user1).approve(rewardsContract.address, user1tokensToDeposit);
+    await rewardsContract.connect(user1).deposit(user1tokensToDeposit);
+
+    // user2 deposits 200 tokens
+    await stakingTokenContract.connect(user2).approve(rewardsContract.address, user2tokensToDeposit);
+    await rewardsContract.connect(user2).deposit(user2tokensToDeposit);
+
+    // user1 should have 0 rewards
+    expect(await rewardsContract.connect(user1).previewClaim(user1.address)).to.equal(0);
+
+    // user2 should have 0 rewards
+    expect(await rewardsContract.connect(user2).previewClaim(user2.address)).to.equal(0);
+
+    // check rewards contract balance
+    expect(await ethers.provider.getBalance(rewardsContract.address)).to.equal(0);
+
+    // advance time by 1 week
+    await ethers.provider.send("evm_increaseTime", [604801]); // 1 week + 1 second
+    await ethers.provider.send("evm_mine");
+
+    // send 1 wei to the contract
+    await owner.sendTransaction({ 
+      value: String("1"), // 1 wei
+      to: rewardsContract.address 
+    });
+
+    // check rewards contract balance
+    expect(await ethers.provider.getBalance(rewardsContract.address)).to.equal(1);
+
+    // check rewards contract totalSupply
+    expect(await rewardsContract.totalSupply()).to.equal(user1tokensToDeposit.add(user2tokensToDeposit));
+
+    // user1: previewClaim
+    expect(await rewardsContract.connect(user1).previewClaim(user1.address)).to.equal(0); // looks like no one can claim
+
+    // user2: previewClaim
+    expect(await rewardsContract.connect(user2).previewClaim(user2.address)).to.equal(0); // looks like no one can claim
+  });
 
   // Scenario 3: user tries to withdraw their staking tokens before the asset lock period is over
 

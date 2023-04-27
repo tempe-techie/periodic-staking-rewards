@@ -40,4 +40,4 @@ function deposit(uint256 assets) external returns (uint256)
 
 ## Use at your own risk
 
-The contracts have not been audited. Use at your own risk.
+The contracts have not been audited by a third party. Use at your own risk.
