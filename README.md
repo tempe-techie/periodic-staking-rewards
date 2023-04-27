@@ -2,20 +2,19 @@
 
 > Still work-in-progress (WIP)
 
-Staking smart contract vault that issues ETH or token rewards to stakers. Rewards are issued for a selected period (e.g. 1 week).
+This is a staking smart contract vault that periodically issues ETH rewards to stakers.
 
-The PeriodicEthRewards.sol is partially compatible with ERC-4626 (some of the important function headers are the same).
+ETH can be sent to the contract at any time without a specific schedule. This feature is useful for protocols that collect fees and want to distribute them to specific token holders. The staking contract can run indefinitely without an end date.
+
+The smart contract deployer sets a reward period, which can be, for example, one week. During this time, rewards accrue for stakers. Once the period is over, stakers have one week to collect their rewards. If they do not, their reward is forfeited and rolled over into the next period. The claim period is always the same length as the reward accrual period.
 
 Actions:
 - Claim
-- Deposit & Lock & Claim
-- Withdraw & Claim
+- Deposit (& Lock & Claim)
+- Withdraw (& Claim)
 
 TODO:
-- futureClaim view function?
-  - function that calculates the future claim for a given user based on futureRewards and user's balanceOf
-  - the future claim is not exact, because it may change up or down depending on the futureRewards and other users' deposits/withdrawals
-- reentrancy guard for the _claim function?
+- mitigate an asset locking attack
 - Tests
 
 ## Potential issues
@@ -39,6 +38,12 @@ In that case would could also change the `withdraw` function and allow msg sende
 ```solidity
 function withdraw(uint256 assets) external returns (uint256)
 ```
+
+## Limitations
+
+### Rebasing tokens are not supported
+
+Tokens that intrinsically change balance (without tokens holders doing anything) such as stETH or AMPL are not supported as assets/staking tokens. Please avoid using them.
 
 ## Use at your own risk
 

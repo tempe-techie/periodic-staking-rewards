@@ -5,17 +5,13 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { IERC1155 } from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 import { IERC721 } from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 /// @title Staking contract with periodic ETH rewards
 /// @author Tempe Techie
-/** 
-@notice 
-This contract issues a receipt token for any staked token (asset) in 1:1 ratio.
-Receipt token holders can claim ETH rewards periodically.
-The contract tries to follow the ERC-4626 standard with function names, but is not fully ERC-4626 compatible.
-*/
-contract PeriodicEthRewards is ERC20, Ownable {
-  address public immutable asset; // staked token address
+/// @notice The contract issues a receipt token for any staked token in 1:1 ratio. Receipt token holders can claim ETH rewards periodically.
+contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
+  address public immutable asset; // staked token address (rebase tokens are not supported)
   
   uint256 public claimRewardsTotal; // total ETH rewards that can be claimed for the previous period
   uint256 public claimRewardsMinimum; // if the minimum is not reached, no one can claim and all ETH rewards roll over into the next period
@@ -23,8 +19,8 @@ contract PeriodicEthRewards is ERC20, Ownable {
   uint256 public futureRewards; // ETH rewards that have not been claimed yet
   uint256 public lastClaimPeriod; // timestamp of the last claim period
 
-  uint256 public maxUserDeposit = type(uint256).max; // maximum amount of tokens that can be deposited by a user (in wei)
-  uint256 public minUserDeposit; // minimum amount of tokens that can be deposited by a user (in wei)
+  uint256 public maxDeposit = type(uint256).max; // maximum amount of tokens that can be deposited by a user (in wei)
+  uint256 public minDeposit; // minimum amount of tokens that can be deposited by a user (in wei)
 
   uint256 public immutable periodLength; // length of the claim period (in seconds), the most common is 1 week (604800 seconds)
 
@@ -37,13 +33,13 @@ contract PeriodicEthRewards is ERC20, Ownable {
     string memory _receiptTokenName,
     string memory _receiptTokenSymbol,
     uint256 _claimRewardsMinimum,
-    uint256 _minUserDeposit,
+    uint256 _minDeposit,
     uint256 _periodLength
   ) ERC20(_receiptTokenName, _receiptTokenSymbol) {
     asset = _asset;
     
     claimRewardsMinimum = _claimRewardsMinimum;
-    minUserDeposit = _minUserDeposit;
+    minDeposit = _minDeposit;
     periodLength = _periodLength;
 
     lastClaimPeriod = block.timestamp;
@@ -81,23 +77,19 @@ contract PeriodicEthRewards is ERC20, Ownable {
     return 0;
   }
 
-  function maxDeposit(address receiver) public view returns (uint256) {
-    // you can customize it and return different values for different users
-    return maxUserDeposit;
-  }
-
-  function maxWithdraw(address owner) public view returns (uint256) {
-    return balanceOf(owner);
-  }
-
-  function minDeposit(address receiver) public view returns (uint256) {
-    // you can customize it and return different values for different users
-    return minUserDeposit;
-  }
-
+  /// @notice Returns the amount of ETH that can be claimed for a given user
   function previewClaim(address claimer) public view returns (uint256) {
     if (lastClaimed[claimer] < lastClaimPeriod && totalSupply() > 0) {
       return claimRewardsTotal * balanceOf(claimer) / totalSupply(); // get ETH claim for a given user
+    }
+
+    return 0;
+  }
+
+  /// @notice Returns the amount of ETH that may be claimed for a given user in the next claim period. The amount can change up or down until the current period is over.
+  function previewFutureClaim(address claimer) external view returns (uint256) {
+    if (totalSupply() > 0) {
+      return futureRewards * balanceOf(claimer) / totalSupply(); // get future ETH claim for a given user
     }
 
     return 0;
@@ -163,19 +155,19 @@ contract PeriodicEthRewards is ERC20, Ownable {
   // WRITE
 
   /// @notice Claim ETH rewards for yourself.
-  function claimRewards() external returns (uint256) {
+  function claimRewards() nonReentrant external returns (uint256) {
     return _claim(_msgSender()); // returns the amount of ETH claimed
   }
 
   /// @notice Claim ETH rewards for someone else.
-  function claimRewardsFor(address claimer) external returns (uint256) {
+  function claimRewardsFor(address claimer) nonReentrant external returns (uint256) {
     return _claim(claimer); // returns the amount of ETH claimed
   }
 
   /// @notice Deposit assets and mint receipt tokens.
-  function deposit(uint256 assets, address receiver) external returns (uint256) {
-    require(assets <= maxDeposit(receiver), "PeriodicEthRewards: deposit more than max");
-    require(assets >= minUserDeposit, "PeriodicEthRewards: deposit less than min");
+  function deposit(uint256 assets, address receiver) nonReentrant external returns (uint256) {
+    require(assets <= maxDeposit, "PeriodicEthRewards: deposit more than max");
+    require(assets >= minDeposit, "PeriodicEthRewards: deposit less than min");
 
     lastDeposit[receiver] = block.timestamp; // after deposit withdrawals are disabled for periodLength
 
@@ -193,13 +185,13 @@ contract PeriodicEthRewards is ERC20, Ownable {
   }
 
   /// @notice Withdraw assets and burn receipt tokens.
-  function withdraw(uint256 assets, address receiver, address owner) external returns (uint256) {
-    require(assets <= maxWithdraw(owner), "PeriodicEthRewards: withdraw more than max");
+  function withdraw(uint256 assets, address receiver, address owner) nonReentrant external returns (uint256) {
+    require(assets <= balanceOf(owner), "PeriodicEthRewards: cannot withdraw more than balance");
     require(block.timestamp > (lastDeposit[owner] + periodLength), "PeriodicEthRewards: assets are still locked");
 
     // if not full withdraw, require balance to stay at least the min user deposit amount
     if (balanceOf(owner) > assets) {
-      require((balanceOf(owner) - assets) >= minUserDeposit, "PeriodicEthRewards: the remained balance must be at least the min deposit amount");
+      require((balanceOf(owner) - assets) >= minDeposit, "PeriodicEthRewards: the remained balance must be at least the min deposit amount");
     }
 
     if (_msgSender() != owner) {
@@ -254,13 +246,13 @@ contract PeriodicEthRewards is ERC20, Ownable {
   }
 
   /// @notice Sets the maximum amount of assets that a user can deposit at once.
-  function setMaxUserDeposit(uint256 _maxUserDeposit) external onlyOwner {
-    maxUserDeposit = _maxUserDeposit;
+  function setMaxDeposit(uint256 _maxDeposit) external onlyOwner {
+    maxDeposit = _maxDeposit;
   }
 
   /// @notice Sets the minimum amount of assets that a user can deposit.
-  function setMinUserDeposit(uint256 _minUserDeposit) external onlyOwner {
-    minUserDeposit = _minUserDeposit;
+  function setMinDeposit(uint256 _minDeposit) external onlyOwner {
+    minDeposit = _minDeposit;
   }
 
 }
