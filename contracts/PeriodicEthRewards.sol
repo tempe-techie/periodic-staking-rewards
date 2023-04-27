@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.17;
+pragma solidity ^0.8.17; // solhint-disable-line compiler-version
 
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { IERC1155 } from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
@@ -9,12 +9,13 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuar
 
 /// @title Staking contract with periodic ETH rewards
 /// @author Tempe Techie
-/// @notice The contract issues a receipt token for any staked token in 1:1 ratio. Receipt token holders can claim ETH rewards periodically.
+/** @notice The contract issues a receipt token for any staked token in 1:1 ratio. Receipt token holders can 
+claim ETH rewards periodically. */
 contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   address public immutable asset; // staked token address (rebase tokens are not supported)
   
   uint256 public claimRewardsTotal; // total ETH rewards that can be claimed for the previous period
-  uint256 public claimRewardsMinimum; // if the minimum is not reached, no one can claim and all ETH rewards roll over into the next period
+  uint256 public claimRewardsMinimum; // if minimum not reached, no one can claim (all ETH rewards go to next period)
 
   uint256 public futureRewards; // ETH rewards that have not been claimed yet
   uint256 public lastClaimPeriod; // timestamp of the last claim period
@@ -22,7 +23,7 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   uint256 public maxDeposit = type(uint256).max; // maximum amount of tokens that can be deposited by a user (in wei)
   uint256 public minDeposit; // minimum amount of tokens that can be deposited by a user (in wei)
 
-  uint256 public immutable periodLength; // length of the claim period (in seconds), the most common is 1 week (604800 seconds)
+  uint256 public immutable periodLength; // length of the claim period (in seconds), the most common is 1 week (604800s)
 
   mapping (address => uint256) public lastClaimed; // timestamp of the last claim for each user
   mapping (address => uint256) public lastDeposit; // timestamp of the last deposit for each user
@@ -58,17 +59,13 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
 
   // READ
 
-  // TODO: futureClaim view function?
-  // - function that calculates the future claim for a given user based on futureRewards and user's balanceOf
-  // - the future claim is not exact, because it may change up or down depending on the futureRewards and other users' deposits/withdrawals
-
   /// @notice Returns the amount of time left (in seconds) until the user can withdraw their assets.
-  function getLockedTimeLeft(address owner) external view returns (uint256) {
-    if (lastDeposit[owner] == 0) {
+  function getLockedTimeLeft(address _owner) external view returns (uint256) {
+    if (lastDeposit[_owner] == 0) {
       return 0;
     }
 
-    uint256 timeLeft = lastDeposit[owner] + periodLength - block.timestamp;
+    uint256 timeLeft = lastDeposit[_owner] + periodLength - block.timestamp;
 
     if (timeLeft > 0) {
       return timeLeft;
@@ -78,18 +75,19 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   }
 
   /// @notice Returns the amount of ETH that can be claimed for a given user
-  function previewClaim(address claimer) public view returns (uint256) {
-    if (lastClaimed[claimer] < lastClaimPeriod && totalSupply() > 0) {
-      return claimRewardsTotal * balanceOf(claimer) / totalSupply(); // get ETH claim for a given user
+  function previewClaim(address _claimer) public view returns (uint256) {
+    if (lastClaimed[_claimer] < lastClaimPeriod && totalSupply() > 0) {
+      return claimRewardsTotal * balanceOf(_claimer) / totalSupply(); // get ETH claim for a given user
     }
 
     return 0;
   }
 
-  /// @notice Returns the amount of ETH that may be claimed for a given user in the next claim period. The amount can change up or down until the current period is over.
-  function previewFutureClaim(address claimer) external view returns (uint256) {
+  /** @notice Returns the amount of ETH that may be claimed for a given user in the next claim period. The amount can 
+  change up or down until the current period is over. */
+  function previewFutureClaim(address _claimer) external view returns (uint256) {
     if (totalSupply() > 0) {
-      return futureRewards * balanceOf(claimer) / totalSupply(); // get future ETH claim for a given user
+      return futureRewards * balanceOf(_claimer) / totalSupply(); // get future ETH claim for a given user
     }
 
     return 0;
@@ -100,7 +98,7 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   function _beforeTokenTransfer(
     address from,
     address to,
-    uint256 amount
+    uint256 amount // solhint-disable-line no-unused-vars
   ) internal virtual override {
     if (from != address(0)) {
       _claim(from);
@@ -111,16 +109,16 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
     }
   }
 
-  function _claim(address claimer) internal returns (uint256 ethToClaim) {
+  function _claim(address _claimer) internal returns (uint256 ethToClaim) {
     // check if claimer has any ETH (left) to claim
-    ethToClaim = previewClaim(claimer);
+    ethToClaim = previewClaim(_claimer);
 
     if (ethToClaim > 0) {
       // update lastClaimed
-      lastClaimed[claimer] = block.timestamp;
+      lastClaimed[_claimer] = block.timestamp;
 
       // send ETH to the claimer
-      (bool success, ) = payable(claimer).call{value: ethToClaim}("");
+      (bool success, ) = payable(_claimer).call{value: ethToClaim}("");
       require(success, "ETH transfer failed");
     }
 
@@ -138,7 +136,7 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
         claimRewardsTotal = address(this).balance;
         futureRewards = 0; // reset future rewards to 0
       } else {
-        claimRewardsTotal = 0; // if the minimum is not reached, no one can claim. All ETH rewards roll over into the next period
+        claimRewardsTotal = 0; // if minimum not reached, no one can claim. All ETH rewards go into the next period
         futureRewards = address(this).balance; // set future rewards to the current balance
       } 
     }
@@ -146,7 +144,8 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
 
   // RECEIVE (receive ETH)
   receive() external payable {
-    // futureRewards update must happen before _updateLastClaimPeriod() because claimRewardsTotal is then set to current balance
+    // futureRewards update must happen before _updateLastClaimPeriod() 
+    // because claimRewardsTotal is then set to current balance
     futureRewards += msg.value;
 
     _updateLastClaimPeriod();
@@ -155,17 +154,17 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   // WRITE
 
   /// @notice Claim ETH rewards for yourself.
-  function claimRewards() nonReentrant external returns (uint256) {
+  function claimRewards() external nonReentrant returns (uint256) {
     return _claim(_msgSender()); // returns the amount of ETH claimed
   }
 
   /// @notice Claim ETH rewards for someone else.
-  function claimRewardsFor(address claimer) nonReentrant external returns (uint256) {
-    return _claim(claimer); // returns the amount of ETH claimed
+  function claimRewardsFor(address _claimer) external nonReentrant returns (uint256) {
+    return _claim(_claimer); // returns the amount of ETH claimed
   }
 
   /// @notice Deposit assets and mint receipt tokens.
-  function deposit(uint256 assets, address receiver) nonReentrant external returns (uint256) {
+  function deposit(uint256 assets, address receiver) external nonReentrant returns (uint256) {
     require(assets <= maxDeposit, "PeriodicEthRewards: deposit more than max");
     require(assets >= minDeposit, "PeriodicEthRewards: deposit less than min");
 
@@ -185,13 +184,16 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   }
 
   /// @notice Withdraw assets and burn receipt tokens.
-  function withdraw(uint256 assets, address receiver, address owner) nonReentrant external returns (uint256) {
+  function withdraw(uint256 assets, address receiver, address owner) external nonReentrant returns (uint256) {
     require(assets <= balanceOf(owner), "PeriodicEthRewards: cannot withdraw more than balance");
     require(block.timestamp > (lastDeposit[owner] + periodLength), "PeriodicEthRewards: assets are still locked");
 
     // if not full withdraw, require balance to stay at least the min user deposit amount
     if (balanceOf(owner) > assets) {
-      require((balanceOf(owner) - assets) >= minDeposit, "PeriodicEthRewards: the remained balance must be at least the min deposit amount");
+      require(
+        (balanceOf(owner) - assets) >= minDeposit, 
+        "PeriodicEthRewards: the remaining balance too low"
+      );
     }
 
     if (_msgSender() != owner) {
@@ -201,7 +203,8 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
     _burn(owner, assets); // burn receipt tokens
     ERC20(asset).transfer(receiver, assets); // receive back the asset tokens (staking tokens)
 
-    // note: if user withdraws all staked tokens, they forfeit their claim for the current staking period (unless they deposit again)
+    // note: if user withdraws all staked tokens, they forfeit their claim for the current 
+    // staking period (unless they deposit again)
 
     emit Withdraw(_msgSender(), receiver, owner, assets);
 
@@ -224,11 +227,17 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   }
 
   /// @notice Recover any ERC-1155 token mistakenly sent to this contract address
-  function recoverERC1155(address tokenAddress_, uint256 tokenId_, address recipient_, uint256 _amount) external onlyOwner {
+  function recoverERC1155(
+    address tokenAddress_, 
+    uint256 tokenId_, 
+    address recipient_, 
+    uint256 _amount
+  ) external onlyOwner {
     IERC1155(tokenAddress_).safeTransferFrom(address(this), recipient_, tokenId_, _amount, "");
   }
 
-  /// @notice Recover ETH from contract. This is contentious so it is commented out by default. Uncomment only if you really need it.
+  /** @notice Recover ETH from contract. This is contentious so it is commented out by default. 
+  Uncomment only if you really need it. */
   /*
   function recoverETH(address recipient_, uint256 _amount) external onlyOwner {
     (bool success, ) = payable(recipient_).call{value: _amount}("");

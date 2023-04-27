@@ -168,4 +168,8 @@ describe("PeriodicEthRewards", function () {
   // Scenario 5: rewards amount is lower than claimRewardsMinimum. What happens to rewards? Can users claim?
 
   // Scenario 6: minUserDeposit is set to 1 wei, claimRewardsMinimum is set to 0.0001 ETH. User1 deposits 1 wei, user2 deposits 10 ETH. The reward is 0.001 ETH. How much does each user get?
+
+  // Scenario 7: the asset token has a fee-on-transfer mechanism. How does this affect the totalSupply? Is is the same as the contracts asset balance?
+
+  // Scenario 8: the asset token has 10 decimals (instead of 18). Does this affect the rewards calculation? How about withdrawals?
 });
