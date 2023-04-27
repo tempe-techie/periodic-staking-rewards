@@ -94,15 +94,21 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
     address to,
     uint256 // amount commented out because it is not used
   ) internal virtual override {
+    // both claims run if non-zero address transfers to a non-zero address
+
     if (from != address(0)) {
+      // this does not run on mint, but it runs on burn
       _claim(from);
     }
 
     if (to != address(0)) {
+      // this does not run on burn, but it runs on mint
       _claim(to);
-      // set lastClaimed to the current timestamp just in case the receiver had no previous claims
-      // this prevents double claiming of rewards, because the sender should have gotten all 
-      // the rewards from the current claim period
+      // Set lastClaimed to the current timestamp just in case the receiver had no previous claims.
+      // This prevents double claiming of rewards, because the sender should have gotten all 
+      // the rewards from the current claim period.
+      // This also prevents a new depositor from claiming rewards from the previous period right away.
+      // They have to wait until the next period to claim. It prevents gaming the system.
       lastClaimed[to] = block.timestamp;
     }
   }

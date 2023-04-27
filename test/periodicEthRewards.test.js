@@ -397,10 +397,14 @@ describe("PeriodicEthRewards", function () {
     //expect(await rewardsContract.balanceOf(user2.address)).to.equal(user2tokensToDeposit);
 
   });
+
+  // Scenario 5: User has tokens deposited, the period has ended, but the user has not claimed the rewards yet.
+  // Instead the user wants to deposit more thinking they'll get more rewards. What happens? (They should get 
+  // rewards based on the previous balance, not the new one after the latest deposit.)
 });
 
-// Scenario 5: the asset token has a fee-on-transfer mechanism. How does this affect the totalSupply? Is is the same as the contracts asset balance?
+// Scenario 6: the asset token has a fee-on-transfer mechanism. How does this affect the totalSupply? Is is the same as the contracts asset balance?
   // create new describe block
 
-// Scenario 6: the asset token has 10 decimals (instead of 18). Does this affect the rewards calculation? How about withdrawals?
+// Scenario 7: the asset token has 10 decimals (instead of 18). Does this affect the rewards calculation? How about withdrawals?
   // create new describe block
