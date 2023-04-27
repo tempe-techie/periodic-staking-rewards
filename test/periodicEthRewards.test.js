@@ -27,11 +27,11 @@ describe("PeriodicEthRewards", function () {
   let user2;
   let user3;
 
-  const user1stakingTokenBalance = ethers.utils.parseEther("850");
-  const user2stakingTokenBalance = ethers.utils.parseEther("1500");
+  const user1stakingTokenBalance = ethers.utils.parseEther("850"); // 850 staking tokens
+  const user2stakingTokenBalance = ethers.utils.parseEther("1500"); // 1500 staking tokens
 
-  const claimRewardsMinimum = ethers.utils.parseEther("1");
-  const minUserDeposit = ethers.utils.parseEther("0.0001");
+  const claimRewardsMinimum = ethers.utils.parseEther("1"); // 1 ETH as minimum rewards total per period
+  const minUserDeposit = ethers.utils.parseEther("10"); // 10 asset tokens
   const claimPeriod = 604800; // 1 week
 
   beforeEach(async function () {
@@ -67,6 +67,12 @@ describe("PeriodicEthRewards", function () {
     expect(await stakingTokenContract.balanceOf(user1.address)).to.equal(user1stakingTokenBalance);
     expect(await stakingTokenContract.balanceOf(user2.address)).to.equal(user2stakingTokenBalance);
 
+    // revert: user1 tries to deposit 0 tokens
+    await expect(rewardsContract.connect(user1).deposit(0)).to.be.revertedWith("PeriodicEthRewards: deposit is less than min");
+
+    // revert: user1 tries to deposit less than the minimum deposit amount (1 wei less in staking tokens)
+    await expect(rewardsContract.connect(user1).deposit(minUserDeposit.sub(1))).to.be.revertedWith("PeriodicEthRewards: deposit is less than min");
+
     // user1 deposits 100 tokens
     await stakingTokenContract.connect(user1).approve(rewardsContract.address, user1tokensToDeposit);
     await rewardsContract.connect(user1).deposit(user1tokensToDeposit);
@@ -74,6 +80,9 @@ describe("PeriodicEthRewards", function () {
     // user2 deposits 200 tokens
     await stakingTokenContract.connect(user2).approve(rewardsContract.address, user2tokensToDeposit);
     await rewardsContract.connect(user2).deposit(user2tokensToDeposit);
+
+    // revert: user1 tries to withdraw their staking tokens
+    await expect(rewardsContract.connect(user1).withdraw(user1tokensToDeposit)).to.be.revertedWith("PeriodicEthRewards: assets are still locked");
 
     // user1 should have 0 rewards
     expect(await rewardsContract.connect(user1).previewClaim(user1.address)).to.equal(0);
@@ -157,6 +166,17 @@ describe("PeriodicEthRewards", function () {
     const user3BalanceAfter = await ethers.provider.getBalance(user3.address);
     console.log("user3 ETH balance after: ", ethers.utils.formatEther(user3BalanceAfter));
     expect(user3BalanceAfter).to.equal(user3BalanceBefore);
+
+    // withdrawals
+
+    // revert: user1 tries to withdraw more than their balance is (add 1 wei to the deposited amount)
+    await expect(rewardsContract.connect(user1).withdraw(user1tokensToDeposit.add(1))).to.be.revertedWith("PeriodicEthRewards: cannot withdraw more than balance");
+
+    // revert: user1 tries to withdraw the amount that would leave less than the minimum deposit amount in the contract (subtract 1 wei from the deposited amount)
+    await expect(rewardsContract.connect(user1).withdraw(user1tokensToDeposit.sub(1))).to.be.revertedWith("PeriodicEthRewards: the remaining balance too low");
+
+    // revert: user1 tries to withdraw 0 tokens
+    await expect(rewardsContract.connect(user1).withdraw(0)).to.be.revertedWith("PeriodicEthRewards: cannot withdraw 0");
   });
 
   // Scenario 2: there's a very small amount of ETH in the rewards contract (just 1 wei). claimRewardsMinimum needs to be set to 0.
@@ -218,15 +238,13 @@ describe("PeriodicEthRewards", function () {
     expect(await rewardsContract.connect(user2).previewClaim(user2.address)).to.equal(0); // looks like no one can claim
   });
 
-  // Scenario 3: user tries to withdraw their staking tokens before the asset lock period is over
+  // Scenario 3: user sends receipt tokens to another address. What happens to the rewards? (both addresses try to claim rewards)
 
-  // Scenario 4: user sends receipt tokens to another address. What happens to the rewards? (both addresses try to claim rewards)
+  // Scenario 4: minUserDeposit is set to 1 wei, claimRewardsMinimum is set to 0.0001 ETH. User1 deposits 1 wei, user2 deposits 10 ETH. The reward is 0.001 ETH. How much does each user get?
 
-  // Scenario 5: rewards amount is lower than claimRewardsMinimum. What happens to rewards? Can users claim?
+  // Scenario 5: the asset token has a fee-on-transfer mechanism. How does this affect the totalSupply? Is is the same as the contracts asset balance?
+    // create new describe block
 
-  // Scenario 6: minUserDeposit is set to 1 wei, claimRewardsMinimum is set to 0.0001 ETH. User1 deposits 1 wei, user2 deposits 10 ETH. The reward is 0.001 ETH. How much does each user get?
-
-  // Scenario 7: the asset token has a fee-on-transfer mechanism. How does this affect the totalSupply? Is is the same as the contracts asset balance?
-
-  // Scenario 8: the asset token has 10 decimals (instead of 18). Does this affect the rewards calculation? How about withdrawals?
+  // Scenario 6: the asset token has 10 decimals (instead of 18). Does this affect the rewards calculation? How about withdrawals?
+    // create new describe block
 });

@@ -159,8 +159,8 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
 
   /// @notice Deposit assets and mint receipt tokens.
   function deposit(uint256 assets) external nonReentrant returns (uint256) {
-    require(assets <= maxDeposit, "PeriodicEthRewards: deposit more than max");
-    require(assets >= minDeposit, "PeriodicEthRewards: deposit less than min");
+    require(assets <= maxDeposit, "PeriodicEthRewards: deposit is more than max");
+    require(assets >= minDeposit, "PeriodicEthRewards: deposit is less than min");
 
     lastDeposit[_msgSender()] = block.timestamp; // after deposit withdrawals are disabled for periodLength
 
@@ -179,6 +179,7 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
 
   /// @notice Withdraw assets and burn receipt tokens.
   function withdraw(uint256 assets) external nonReentrant returns (uint256) {
+    require(assets > 0, "PeriodicEthRewards: cannot withdraw 0");
     require(assets <= balanceOf(_msgSender()), "PeriodicEthRewards: cannot withdraw more than balance");
     require(block.timestamp > (lastDeposit[_msgSender()] + periodLength), "PeriodicEthRewards: assets are still locked");
 
