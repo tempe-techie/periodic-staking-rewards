@@ -65,15 +65,15 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   // READ
 
   /// @notice Returns the amount of time left (in seconds) until the user can withdraw their assets.
-  function getLockedTimeLeft(address _owner) external view returns (uint256) {
-    if (lastDeposit[_owner] == 0) {
+  function getLockedTimeLeft(address _user) external view returns (uint256) {
+    if (lastDeposit[_user] == 0) {
       return 0;
     }
 
-    uint256 timeLeft = lastDeposit[_owner] + periodLength - block.timestamp;
+    uint256 _timeLeft = lastDeposit[_user] + periodLength - block.timestamp;
 
-    if (timeLeft > 0) {
-      return timeLeft;
+    if (_timeLeft > 0) {
+      return _timeLeft;
     }
 
     return 0;
@@ -101,44 +101,44 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   // INTERNAL
 
   function _beforeTokenTransfer(
-    address from,
-    address to,
-    uint256 amount
-  ) internal virtual override {
-    super._beforeTokenTransfer(from, to, amount);
+    address _from,
+    address _to,
+    uint256 _amount
+  ) internal override {
+    super._beforeTokenTransfer(_from, _to, _amount);
 
     // both claims run if non-zero address transfers to a non-zero address
 
-    if (from != address(0)) {
+    if (_from != address(0)) {
       // this does not run on mint, but it runs on burn
-      _claim(from);
+      _claim(_from);
     }
 
-    if (to != address(0)) {
+    if (_to != address(0)) {
       // this does not run on burn, but it runs on mint
-      _claim(to);
+      _claim(_to);
       // Set lastClaimed to the current timestamp just in case the receiver had no previous claims.
       // This prevents double claiming of rewards, because the sender should have gotten all 
       // the rewards from the current claim period.
       // This also prevents a new depositor from claiming rewards from the previous period right away.
       // They have to wait until the next period to claim. It prevents gaming the system.
-      lastClaimed[to] = block.timestamp;
+      lastClaimed[_to] = block.timestamp;
     }
   }
 
-  function _claim(address _claimer) internal returns (uint256 ethToClaim) {
+  function _claim(address _claimer) internal returns (uint256 _ethToClaim) {
     // check if claimer has any ETH (left) to claim
-    ethToClaim = previewClaim(_claimer);
+    _ethToClaim = previewClaim(_claimer);
 
-    if (ethToClaim > 0) {
+    if (_ethToClaim > 0) {
       // update lastClaimed
       lastClaimed[_claimer] = block.timestamp;
 
       // send ETH to the claimer
-      (bool success, ) = payable(_claimer).call{value: ethToClaim}("");
-      require(success, "ETH transfer failed");
+      (bool _success, ) = payable(_claimer).call{value: _ethToClaim}("");
+      require(_success, "ETH transfer failed");
 
-      emit Claim(_msgSender(), _claimer, ethToClaim);
+      emit Claim(_msgSender(), _claimer, _ethToClaim);
     }
 
     _updateLastClaimPeriod();
@@ -185,18 +185,18 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   }
 
   /// @notice Deposit assets and mint receipt tokens.
-  function deposit(uint256 assets) external nonReentrant returns (uint256) {
-    require(assets <= maxDeposit, "PeriodicEthRewards: deposit is more than max");
-    require(assets >= minDeposit, "PeriodicEthRewards: deposit is less than min");
+  function deposit(uint256 _assets) external nonReentrant returns (uint256) {
+    require(_assets <= maxDeposit, "PeriodicEthRewards: deposit is more than max");
+    require(_assets >= minDeposit, "PeriodicEthRewards: deposit is less than min");
 
     lastDeposit[_msgSender()] = block.timestamp; // after deposit withdrawals are disabled for periodLength
 
-    ERC20(asset).transferFrom(_msgSender(), address(this), assets); // transfer staking tokens to this contract
-    _mint(_msgSender(), assets); // mint receipt tokens
+    ERC20(asset).transferFrom(_msgSender(), address(this), _assets); // transfer staking tokens to this contract
+    _mint(_msgSender(), _assets); // mint receipt tokens
 
-    emit Deposit(_msgSender(), assets);
+    emit Deposit(_msgSender(), _assets);
 
-    return assets;
+    return _assets;
   }
 
   /// @notice Manually update the last claim period (if needed). Anyone can call this function.
@@ -205,28 +205,30 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   }
 
   /// @notice Withdraw assets and burn receipt tokens.
-  function withdraw(uint256 assets) external nonReentrant returns (uint256) {
-    require(assets > 0, "PeriodicEthRewards: cannot withdraw 0");
-    require(assets <= balanceOf(_msgSender()), "PeriodicEthRewards: cannot withdraw more than balance");
+  function withdraw(uint256 _assets) external nonReentrant returns (uint256) {
+    uint _balance = balanceOf(_msgSender());
+
+    require(_assets > 0, "PeriodicEthRewards: cannot withdraw 0");
+    require(_assets <= _balance, "PeriodicEthRewards: cannot withdraw more than balance");
     require(block.timestamp > (lastDeposit[_msgSender()] + periodLength), "PeriodicEthRewards: assets are still locked");
 
     // if not full withdraw, require balance to stay at least the min user deposit amount
-    if (balanceOf(_msgSender()) > assets) {
+    if (_balance > _assets) {
       require(
-        (balanceOf(_msgSender()) - assets) >= minDeposit, 
+        (_balance - _assets) >= minDeposit, 
         "PeriodicEthRewards: the remaining balance too low"
       );
     }
 
-    _burn(_msgSender(), assets); // burn receipt tokens
-    ERC20(asset).transfer(_msgSender(), assets); // receive back the asset tokens (staking tokens)
+    _burn(_msgSender(), _assets); // burn receipt tokens
+    ERC20(asset).transfer(_msgSender(), _assets); // receive back the asset tokens (staking tokens)
 
     // note: if user withdraws all staked tokens, they forfeit their claim for the current 
     // staking period (unless they deposit again)
 
-    emit Withdraw(_msgSender(), assets);
+    emit Withdraw(_msgSender(), _assets);
 
-    return assets;
+    return _assets;
   }
 
   // OWNER

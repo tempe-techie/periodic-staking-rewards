@@ -469,6 +469,8 @@ describe("PeriodicEthRewards", function () {
     const user1BalanceAfter = await ethers.provider.getBalance(user1.address);
     console.log("user1 ETH balance after: ", ethers.utils.formatEther(user1BalanceAfter));
     console.log("user1 ETH balance difference: ", ethers.utils.formatEther(user1BalanceAfter.sub(user1BalanceBefore)));
+    // expect the user1 ETH balance to be increased by approximately 3 ETH (30% of the rewards)
+    expect(user1BalanceAfter.sub(user1BalanceBefore)).to.be.closeTo(ethers.utils.parseEther("3"), ethers.utils.parseEther("0.01"));
 
     // user1 receipt token balance after the deposit
     const user1ReceiptTokenBalanceAfter = await rewardsContract.balanceOf(user1.address);
