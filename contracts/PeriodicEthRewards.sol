@@ -47,8 +47,15 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   }
 
   // EVENTS
-
+  event Claim(address indexed owner, uint256 rewards);
   event Deposit(address indexed owner, uint256 assets);
+  event LastClaimPeriodUpdate(address indexed user, uint256 timestamp, uint256 claimRewardsTotal_, uint256 futureRewards_);
+  event OwnerClaimRewardsMinimumSet(address indexed owner, uint256 claimRewardsMinimum_);
+  event OwnerMaxDepositSet(address indexed owner, uint256 maxDeposit_);
+  event OwnerMinDepositSet(address indexed owner, uint256 minDeposit_);
+  event OwnerRecoverErc20(address indexed owner, address indexed token, uint256 amount);
+  event OwnerRecoverErc721(address indexed owner, address indexed token, uint256 tokenId);
+  event OwnerRecoverErc1155(address indexed owner, address indexed token, uint256 tokenId, uint256 amount);
   event Withdraw(address indexed owner, uint256 assets);
 
   // READ
@@ -126,6 +133,8 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
       // send ETH to the claimer
       (bool success, ) = payable(_claimer).call{value: ethToClaim}("");
       require(success, "ETH transfer failed");
+
+      emit Claim(_claimer, ethToClaim);
     }
 
     _updateLastClaimPeriod();
@@ -145,6 +154,8 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
         claimRewardsTotal = 0; // if minimum not reached, no one can claim. All ETH rewards go into the next period
         futureRewards = address(this).balance; // set future rewards to the current balance
       } 
+
+      emit LastClaimPeriodUpdate(_msgSender(), block.timestamp, claimRewardsTotal, futureRewards);
     }
   }
 
@@ -217,26 +228,30 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   // OWNER
 
   /// @notice Recover any ERC-20 token mistakenly sent to this contract address (except the staking and receipt tokens)
-  function recoverERC20(address tokenAddress_, uint256 tokenAmount_, address recipient_) external onlyOwner {
-    require(tokenAddress_ != asset, "PeriodicEthRewards: cannot recover staking token");
-    require(tokenAddress_ != address(this), "PeriodicEthRewards: cannot recover receipt token");
+  function recoverERC20(address _tokenAddress, uint256 _tokenAmount, address _recipient) external onlyOwner {
+    require(_tokenAddress != asset, "PeriodicEthRewards: cannot recover staking token");
+    require(_tokenAddress != address(this), "PeriodicEthRewards: cannot recover receipt token");
 
-    ERC20(tokenAddress_).transfer(recipient_, tokenAmount_);
+    ERC20(_tokenAddress).transfer(_recipient, _tokenAmount);
+
+    emit OwnerRecoverErc20(_msgSender(), _tokenAddress, _tokenAmount);
   }
 
   /// @notice Recover any ERC-721 token mistakenly sent to this contract address
-  function recoverERC721(address tokenAddress_, uint256 tokenId_, address recipient_) external onlyOwner {
-    IERC721(tokenAddress_).transferFrom(address(this), recipient_, tokenId_);
+  function recoverERC721(address _tokenAddress, uint256 _tokenId, address _recipient) external onlyOwner {
+    IERC721(_tokenAddress).transferFrom(address(this), _recipient, _tokenId);
+    emit OwnerRecoverErc721(_msgSender(), _tokenAddress, _tokenId);
   }
 
   /// @notice Recover any ERC-1155 token mistakenly sent to this contract address
   function recoverERC1155(
-    address tokenAddress_, 
-    uint256 tokenId_, 
-    address recipient_, 
+    address _tokenAddress, 
+    uint256 _tokenId, 
+    address _recipient, 
     uint256 _amount
   ) external onlyOwner {
-    IERC1155(tokenAddress_).safeTransferFrom(address(this), recipient_, tokenId_, _amount, "");
+    IERC1155(_tokenAddress).safeTransferFrom(address(this), _recipient, _tokenId, _amount, "");
+    emit OwnerRecoverErc1155(_msgSender(), _tokenAddress, _tokenId, _amount);
   }
 
   /** @notice Recover ETH from contract. This is contentious so it is commented out by default. 
@@ -255,16 +270,19 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   */
   function setClaimRewardsMinimum(uint256 _claimRewardsMinimum) external onlyOwner {
     claimRewardsMinimum = _claimRewardsMinimum;
+    emit OwnerClaimRewardsMinimumSet(_msgSender(), _claimRewardsMinimum);
   }
 
   /// @notice Sets the maximum amount of assets that a user can deposit at once.
   function setMaxDeposit(uint256 _maxDeposit) external onlyOwner {
     maxDeposit = _maxDeposit;
+    emit OwnerMaxDepositSet(_msgSender(), _maxDeposit);
   }
 
   /// @notice Sets the minimum amount of assets that a user can deposit.
   function setMinDeposit(uint256 _minDeposit) external onlyOwner {
     minDeposit = _minDeposit;
+    emit OwnerMinDepositSet(_msgSender(), _minDeposit);
   }
 
 }
