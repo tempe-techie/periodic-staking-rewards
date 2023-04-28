@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.17; // solhint-disable-line compiler-version
+pragma solidity ^0.8.17;
 
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { IERC1155 } from "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
@@ -12,7 +12,7 @@ import { ReentrancyGuard } from "@openzeppelin/contracts/security/ReentrancyGuar
 /** @notice The contract issues a receipt token for any staked token in 1:1 ratio. Receipt token holders can 
 claim ETH rewards periodically. */
 contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
-  address public immutable asset; // staked token address (rebase tokens are not supported)
+  address public immutable asset; // staked token address (rebase tokens and tokens with fee-on-transfer are NOT supported!)
   
   uint256 public claimRewardsTotal; // total ETH rewards that can be claimed for the previous period
   uint256 public claimRewardsMinimum; // if minimum not reached, no one can claim (all ETH rewards go to next period)
@@ -92,8 +92,10 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   function _beforeTokenTransfer(
     address from,
     address to,
-    uint256 // amount commented out because it is not used
+    uint256 amount
   ) internal virtual override {
+    super._beforeTokenTransfer(from, to, amount);
+
     // both claims run if non-zero address transfers to a non-zero address
 
     if (from != address(0)) {

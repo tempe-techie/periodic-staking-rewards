@@ -20,12 +20,16 @@ function calculateGasCosts(testName, receipt) {
 
 describe("PeriodicEthRewards", function () {
   let rewardsContract;
+  let rewardsContract2; // using staking token with transfer fee as asset token
   let stakingTokenContract;
+  let stakingTokenContract2; // staking token with transfer fee
 
   let owner;
   let user1;
   let user2;
   let user3;
+
+  let PeriodicEthRewards;
 
   const user1stakingTokenBalance = ethers.utils.parseEther("850"); // 850 staking tokens
   const user2stakingTokenBalance = ethers.utils.parseEther("1500"); // 1500 staking tokens
@@ -41,7 +45,11 @@ describe("PeriodicEthRewards", function () {
     stakingTokenContract = await MockErc20Token.deploy("Staking Token", "STK");
     await stakingTokenContract.deployed();
 
-    const PeriodicEthRewards = await ethers.getContractFactory("PeriodicEthRewards");
+    const MockErc20TokenWithTransferFee = await ethers.getContractFactory("MockErc20TokenWithTransferFee");
+    stakingTokenContract2 = await MockErc20TokenWithTransferFee.deploy("Staking Token with tax", "STAX");
+    await stakingTokenContract2.deployed();
+
+    PeriodicEthRewards = await ethers.getContractFactory("PeriodicEthRewards");
     rewardsContract = await PeriodicEthRewards.deploy(
       stakingTokenContract.address,
       "Receipt Token",
@@ -466,10 +474,64 @@ describe("PeriodicEthRewards", function () {
     const user1ReceiptTokenBalanceAfter = await rewardsContract.balanceOf(user1.address);
     console.log("user1 receipt token balance after: ", ethers.utils.formatEther(user1ReceiptTokenBalanceAfter));
   });
+
+  // Scenario 6: the asset token has a fee-on-transfer mechanism. How does this affect the totalSupply? Is it the same as the contracts asset balance?
+  it("Scenario 6: asset token has a fee-on-transfer mechanism (NOT SUPPORTED!)", async function() {
+    rewardsContract2 = await PeriodicEthRewards.deploy(
+      stakingTokenContract2.address,
+      "Receipt Token",
+      "RCP",
+      claimRewardsMinimum, // 1 ETH as minimum rewards total per period
+      minUserDeposit, // 0.0001 ETH as minimum user deposit
+      claimPeriod // 1 week claim period
+    );
+    await rewardsContract2.deployed();
+
+    // mint staking tokens for user1 and user2
+    await stakingTokenContract2.mint(user1.address, user1stakingTokenBalance); // 850 tokens
+
+    // check user1 staking token balance 1
+    const userAssetBalance1 = await stakingTokenContract2.balanceOf(user1.address);
+    console.log("user1 staking token balance 1: ", ethers.utils.formatEther(userAssetBalance1));
+
+    // check the staking token balance of the rewards contract 1
+    const rewardsContractAssetBalance1 = await stakingTokenContract2.balanceOf(rewardsContract2.address);
+    console.log("rewards contract staking token balance 1: ", ethers.utils.formatEther(rewardsContractAssetBalance1));
+
+    // check user1 receipt token balance 1
+    const userReceiptTokenBalance1 = await rewardsContract2.balanceOf(user1.address);
+    console.log("user1 receipt token balance 1: ", ethers.utils.formatEther(userReceiptTokenBalance1));
+
+    const user1tokensToDeposit = ethers.utils.parseEther("300");
+    console.log("user1 tokens to deposit: ", ethers.utils.formatEther(user1tokensToDeposit));
+
+    // user1 deposits tokens
+    await stakingTokenContract2.connect(user1).approve(rewardsContract2.address, user1tokensToDeposit);
+    await rewardsContract2.connect(user1).deposit(user1tokensToDeposit);
+
+    // check user1 staking token balance 2
+    const userAssetBalance2 = await stakingTokenContract2.balanceOf(user1.address);
+    console.log("user1 staking token balance 2: ", ethers.utils.formatEther(userAssetBalance2));
+
+    // check user1 receipt token balance 2
+    const userReceiptTokenBalance2 = await rewardsContract2.balanceOf(user1.address);
+    console.log("user1 receipt token balance 2: ", ethers.utils.formatEther(userReceiptTokenBalance2));
+
+    // check the staking token balance of the rewards contract 2
+    const rewardsContractAssetBalance2 = await stakingTokenContract2.balanceOf(rewardsContract2.address);
+    console.log("rewards contract staking token balance 2: ", ethers.utils.formatEther(rewardsContractAssetBalance2));
+
+    // print out the difference between the receipt token total supply and the staking token balance of the rewards contract
+    const totalSupply = await rewardsContract2.totalSupply();
+    console.log("receipt token total supply: ", ethers.utils.formatEther(totalSupply));
+    console.log("staking token balance of the rewards contract: ", ethers.utils.formatEther(rewardsContractAssetBalance2));
+    console.log("difference: ", ethers.utils.formatEther(totalSupply.sub(rewardsContractAssetBalance2)));
+    console.log("Conclusion: DO NOT USE TOKENS WITH FEE-ON-TRANSFER MECHANISM AS ASSETS/STAKING TOKENS!");
+  });
 });
 
-// Scenario 6: the asset token has a fee-on-transfer mechanism. How does this affect the totalSupply? Is is the same as the contracts asset balance?
-  // create new describe block
+
+
 
 // Scenario 7: the asset token has 10 decimals (instead of 18). Does this affect the rewards calculation? How about withdrawals?
   // create new describe block
