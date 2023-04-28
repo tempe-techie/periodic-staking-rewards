@@ -14,7 +14,8 @@ Actions:
 - Withdraw (& Claim)
 
 TODO:
-- Tests
+- Self-auditing using Slither, Mythril, etc.
+- Testnet deployment with frontend
 
 ## Limitations
 
@@ -37,6 +38,12 @@ That's why in this contract the message sender can only deposit or withdraw for 
 ```solidity
 function deposit(uint256 assets) external returns (uint256)
 ```
+
+## Other notes
+
+### Tokens with less than 18 decimals
+
+Tokens with less than 18 decimals seem to work without any issue as asset tokens, but it may still make more sense to only use tokens with 18 decimals as staking/asset tokens - just in case there's an edge case issue that hasn't been caught.
 
 ## Use at your own risk
 

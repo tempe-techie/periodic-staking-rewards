@@ -21,8 +21,13 @@ function calculateGasCosts(testName, receipt) {
 describe("PeriodicEthRewards", function () {
   let rewardsContract;
   let rewardsContract2; // using staking token with transfer fee as asset token
+  let rewardsContract3; // using staking token with 10 decimals
+
   let stakingTokenContract;
   let stakingTokenContract2; // staking token with transfer fee
+  let stakingTokenContract3; // staking token with 10 decimals
+
+  let stakingToken3Decimals = 10;
 
   let owner;
   let user1;
@@ -49,6 +54,10 @@ describe("PeriodicEthRewards", function () {
     stakingTokenContract2 = await MockErc20TokenWithTransferFee.deploy("Staking Token with tax", "STAX");
     await stakingTokenContract2.deployed();
 
+    const MockErc20TokenWithCustomDecimals = await ethers.getContractFactory("MockErc20TokenCustomDecimals");
+    stakingTokenContract3 = await MockErc20TokenWithCustomDecimals.deploy("Staking Token with 10 decimals", "STAX", stakingToken3Decimals);
+    await stakingTokenContract3.deployed();
+
     PeriodicEthRewards = await ethers.getContractFactory("PeriodicEthRewards");
     rewardsContract = await PeriodicEthRewards.deploy(
       stakingTokenContract.address,
@@ -67,7 +76,7 @@ describe("PeriodicEthRewards", function () {
 
   // scenario 1: user1 deposits 300 tokens, user2 deposits 700 tokens
   // user1 should get 30% of the rewards and user2 should get 70% of the rewards after 1 week
-  it("Scenario 1: User1 deposits 300 tokens, user2 deposits 700 tokens. They claim rewards after 1 week.", async function () {
+  it("Scenario 1: User1 deposits 300 tokens, user2 deposits 700 tokens. They claim rewards after 1 week (and again a week later).", async function () {
     const user1tokensToDeposit = ethers.utils.parseEther("300");
     const user2tokensToDeposit = ethers.utils.parseEther("700");
 
@@ -185,6 +194,70 @@ describe("PeriodicEthRewards", function () {
 
     // revert: user1 tries to withdraw 0 tokens
     await expect(rewardsContract.connect(user1).withdraw(0)).to.be.revertedWith("PeriodicEthRewards: cannot withdraw 0");
+
+    // send some more ETH rewards and advance time by 1 week
+
+    // send 18 ETH to the rewards contract
+    await owner.sendTransaction({ 
+      value: ethers.utils.parseEther("18"),
+      to: rewardsContract.address 
+    });
+
+    // check rewards contract balance
+    expect(await ethers.provider.getBalance(rewardsContract.address)).to.equal(ethers.utils.parseEther("18"));
+
+    // advance time by 1 week
+    await ethers.provider.send("evm_increaseTime", [604801]); // 1 week + 1 second
+    await ethers.provider.send("evm_mine");
+
+    // send 2 more ETH to the rewards contract to trigger _updateLastClaimPeriod
+    // this ETH will be added to the rewards pool for the previous claim period, so 20 ETH in total (18 ETH + 2 ETH)
+    await owner.sendTransaction({ 
+      value: ethers.utils.parseEther("2"),
+      to: rewardsContract.address 
+    });
+
+    // check rewards contract balance
+    expect(await ethers.provider.getBalance(rewardsContract.address)).to.equal(ethers.utils.parseEther("20"));
+
+    // user1 can have 30% of the rewards
+    expect(await rewardsContract.connect(user1).previewClaim(user1.address)).to.equal(ethers.utils.parseEther("6"));
+
+    // user2 can have 70% of the rewards
+    expect(await rewardsContract.connect(user2).previewClaim(user2.address)).to.equal(ethers.utils.parseEther("14"));
+
+    // preview claim for user3 (should be 0)
+    expect(await rewardsContract.connect(user3).previewClaim(user3.address)).to.equal(0);
+
+    // user1 ETH balance before
+    const user1BalanceBefore2 = await ethers.provider.getBalance(user1.address);
+    console.log("user1 ETH balance before 2: ", ethers.utils.formatEther(user1BalanceBefore2));
+
+    // owner claims rewards for user1 (so that no gas fees are paid by user1)
+    await rewardsContract.claimRewardsFor(user1.address);
+
+    // user1 ETH balance after
+    const user1BalanceAfter2 = await ethers.provider.getBalance(user1.address);
+    console.log("user1 ETH balance after 2: ", ethers.utils.formatEther(user1BalanceAfter2));
+    expect(user1BalanceAfter2).to.equal(user1BalanceBefore2.add(ethers.utils.parseEther("6")));
+
+    // user2 ETH balance before
+    const user2BalanceBefore2 = await ethers.provider.getBalance(user2.address);
+    console.log("user2 ETH balance before 2: ", ethers.utils.formatEther(user2BalanceBefore2));
+
+    // user2 claims rewards for themselves
+    const tx2 = await rewardsContract.connect(user2).claimRewards();
+    const receipt2 = await tx2.wait();
+    calculateGasCosts("user claimRewards() 2", receipt);
+
+    // user2 ETH balance after
+    const user2BalanceAfter2 = await ethers.provider.getBalance(user2.address);
+    console.log("user2 ETH balance after 2: ", ethers.utils.formatEther(user2BalanceAfter2));
+    // expect user2 balance before to be less than user2 balance after
+    expect(user2BalanceBefore2).to.be.lt(user2BalanceAfter2);
+
+    // check rewards contract balance (should be 0 ETH)
+    expect(await ethers.provider.getBalance(rewardsContract.address)).to.equal(0);
   });
 
   // Scenario 2: there's a very small amount of ETH in the rewards contract (just 1 wei). claimRewardsMinimum needs to be set to 0.
@@ -530,10 +603,77 @@ describe("PeriodicEthRewards", function () {
     console.log("difference: ", ethers.utils.formatEther(totalSupply.sub(rewardsContractAssetBalance2)));
     console.log("Conclusion: DO NOT USE TOKENS WITH FEE-ON-TRANSFER MECHANISM AS ASSETS/STAKING TOKENS!");
   });
+
+  // Scenario 7: the asset token has 10 decimals (instead of 18). Does this affect the rewards calculation? How about withdrawals?
+  it("Scenario 7: asset token has 10 decimals (instead of 18). How does this affect the rewards calculation? How about withdrawals?", async function() {
+    rewardsContract3 = await PeriodicEthRewards.deploy(
+      stakingTokenContract3.address,
+      "Receipt Token",
+      "RCP",
+      claimRewardsMinimum, // 1 ETH as minimum rewards total per period
+      minUserDeposit, // 0.0001 ETH as minimum user deposit
+      claimPeriod // 1 week claim period
+    );
+    await rewardsContract3.deployed();
+
+    const user1stakingToken3Balance = ethers.utils.parseUnits("850", stakingToken3Decimals);
+
+    // mint staking tokens for user1
+    await stakingTokenContract3.mint(user1.address, user1stakingToken3Balance); // 850 tokens
+
+    // check user1 staking token balance 1
+    const userAssetBalance1 = await stakingTokenContract3.balanceOf(user1.address);
+    console.log("user1 staking token balance 1: ", ethers.utils.formatUnits(userAssetBalance1, stakingToken3Decimals));
+
+    // check the staking token balance of the rewards contract 1
+    const rewardsContractAssetBalance1 = await stakingTokenContract3.balanceOf(rewardsContract3.address);
+    console.log("rewards contract staking token balance 1: ", ethers.utils.formatUnits(rewardsContractAssetBalance1, stakingToken3Decimals));
+
+    // check user1 receipt token balance 1
+    const userReceiptTokenBalance1 = await rewardsContract3.balanceOf(user1.address);
+    console.log("user1 receipt token balance 1: ", ethers.utils.formatEther(userReceiptTokenBalance1));
+
+    const user1tokensToDeposit = ethers.utils.parseUnits("300", stakingToken3Decimals);
+    console.log("user1 tokens to deposit: ", ethers.utils.formatUnits(user1tokensToDeposit, stakingToken3Decimals));
+
+    // setMinDeposit to 1 wei
+    await rewardsContract3.setMinDeposit(1);
+    expect(await rewardsContract3.minDeposit()).to.equal(1);
+
+    // user1 deposits tokens
+    await stakingTokenContract3.connect(user1).approve(rewardsContract3.address, user1tokensToDeposit);
+    await rewardsContract3.connect(user1).deposit(user1tokensToDeposit);
+
+    // check user1 staking token balance 2
+    const userAssetBalance2 = await stakingTokenContract3.balanceOf(user1.address);
+    console.log("user1 staking token balance 2: ", ethers.utils.formatUnits(userAssetBalance2, stakingToken3Decimals));
+
+    // check user1 receipt token balance 2
+    const userReceiptTokenBalance2 = await rewardsContract3.balanceOf(user1.address);
+    console.log("user1 receipt token balance 2: ", ethers.utils.formatEther(userReceiptTokenBalance2));
+
+    // check the staking token balance of the rewards contract 2
+    const rewardsContractAssetBalance2 = await stakingTokenContract3.balanceOf(rewardsContract3.address);
+    console.log("rewards contract staking token balance 2: ", ethers.utils.formatUnits(rewardsContractAssetBalance2, stakingToken3Decimals));
+  
+    // advance time by 1 week
+    await ethers.provider.send("evm_increaseTime", [604801]); // 1 week + 1 second
+    await ethers.provider.send("evm_mine");
+  
+    // revert: user1 tries to withdraw their staking tokens
+    await rewardsContract3.connect(user1).withdraw(user1tokensToDeposit);
+
+    // check user1 staking token balance 3
+    const userAssetBalance3 = await stakingTokenContract3.balanceOf(user1.address);
+    console.log("user1 staking token balance 3: ", ethers.utils.formatUnits(userAssetBalance3, stakingToken3Decimals));
+
+    // check user1 receipt token balance 3
+    const userReceiptTokenBalance3 = await rewardsContract3.balanceOf(user1.address);
+    console.log("user1 receipt token balance 3: ", ethers.utils.formatEther(userReceiptTokenBalance3));
+
+    // check the staking token balance of the rewards contract 3
+    const rewardsContractAssetBalance3 = await stakingTokenContract3.balanceOf(rewardsContract3.address);
+    console.log("rewards contract staking token balance 3: ", ethers.utils.formatUnits(rewardsContractAssetBalance3, stakingToken3Decimals));
+  });
+
 });
-
-
-
-
-// Scenario 7: the asset token has 10 decimals (instead of 18). Does this affect the rewards calculation? How about withdrawals?
-  // create new describe block
