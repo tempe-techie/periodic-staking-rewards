@@ -40,15 +40,19 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
     asset = _asset;
     
     claimRewardsMinimum = _claimRewardsMinimum;
+    emit OwnerClaimRewardsMinimumSet(_msgSender(), _claimRewardsMinimum);
+
     minDeposit = _minDeposit;
+    emit OwnerMinDepositSet(_msgSender(), _minDeposit);
+
     periodLength = _periodLength;
 
     lastClaimPeriod = block.timestamp;
   }
 
   // EVENTS
-  event Claim(address indexed owner, uint256 rewards);
-  event Deposit(address indexed owner, uint256 assets);
+  event Claim(address indexed user, address indexed owner, uint256 rewards);
+  event Deposit(address indexed user, uint256 assets);
   event LastClaimPeriodUpdate(address indexed user, uint256 timestamp, uint256 claimRewardsTotal_, uint256 futureRewards_);
   event OwnerClaimRewardsMinimumSet(address indexed owner, uint256 claimRewardsMinimum_);
   event OwnerMaxDepositSet(address indexed owner, uint256 maxDeposit_);
@@ -56,7 +60,7 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   event OwnerRecoverErc20(address indexed owner, address indexed token, uint256 amount);
   event OwnerRecoverErc721(address indexed owner, address indexed token, uint256 tokenId);
   event OwnerRecoverErc1155(address indexed owner, address indexed token, uint256 tokenId, uint256 amount);
-  event Withdraw(address indexed owner, uint256 assets);
+  event Withdraw(address indexed user, uint256 assets);
 
   // READ
 
@@ -134,7 +138,7 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
       (bool success, ) = payable(_claimer).call{value: ethToClaim}("");
       require(success, "ETH transfer failed");
 
-      emit Claim(_claimer, ethToClaim);
+      emit Claim(_msgSender(), _claimer, ethToClaim);
     }
 
     _updateLastClaimPeriod();
