@@ -73,11 +73,11 @@ describe("PeriodicEthRewards", function () {
     // revert: user1 tries to deposit less than the minimum deposit amount (1 wei less in staking tokens)
     await expect(rewardsContract.connect(user1).deposit(minUserDeposit.sub(1))).to.be.revertedWith("PeriodicEthRewards: deposit is less than min");
 
-    // user1 deposits 100 tokens
+    // user1 deposits tokens
     await stakingTokenContract.connect(user1).approve(rewardsContract.address, user1tokensToDeposit);
     await rewardsContract.connect(user1).deposit(user1tokensToDeposit);
 
-    // user2 deposits 200 tokens
+    // user2 deposits tokens
     await stakingTokenContract.connect(user2).approve(rewardsContract.address, user2tokensToDeposit);
     await rewardsContract.connect(user2).deposit(user2tokensToDeposit);
 
@@ -401,6 +401,71 @@ describe("PeriodicEthRewards", function () {
   // Scenario 5: User has tokens deposited, the period has ended, but the user has not claimed the rewards yet.
   // Instead the user wants to deposit more thinking they'll get more rewards. What happens? (They should get 
   // rewards based on the previous balance, not the new one after the latest deposit.)
+  it("Scenario 5: User makes another deposit before claiming", async function() {
+    const user1tokensToDeposit = ethers.utils.parseEther("300");
+    const user2tokensToDeposit = ethers.utils.parseEther("700");
+
+    // user1 deposits tokens
+    await stakingTokenContract.connect(user1).approve(rewardsContract.address, user1tokensToDeposit);
+    await rewardsContract.connect(user1).deposit(user1tokensToDeposit);
+
+    // user2 deposits tokens
+    await stakingTokenContract.connect(user2).approve(rewardsContract.address, user2tokensToDeposit);
+    await rewardsContract.connect(user2).deposit(user2tokensToDeposit);
+
+    // send 9 ETH to the rewards contract
+    await owner.sendTransaction({ 
+      value: ethers.utils.parseEther("9"),
+      to: rewardsContract.address 
+    });
+
+    // check rewards contract balance
+    expect(await ethers.provider.getBalance(rewardsContract.address)).to.equal(ethers.utils.parseEther("9"));
+
+    // advance time by 1 week
+    await ethers.provider.send("evm_increaseTime", [604801]); // 1 week + 1 second
+    await ethers.provider.send("evm_mine");
+
+    // send 1 more ETH to the rewards contract to trigger _updateLastClaimPeriod
+    // this ETH will be added to the rewards pool for the previous claim period, so 10 ETH in total (9 ETH + 1 ETH)
+    await owner.sendTransaction({ 
+      value: ethers.utils.parseEther("1"),
+      to: rewardsContract.address 
+    });
+
+    // check rewards contract balance
+    expect(await ethers.provider.getBalance(rewardsContract.address)).to.equal(ethers.utils.parseEther("10"));
+
+    // user1 can have 30% of the rewards
+    expect(await rewardsContract.connect(user1).previewClaim(user1.address)).to.equal(ethers.utils.parseEther("3"));
+
+    // user2 can have 70% of the rewards
+    expect(await rewardsContract.connect(user2).previewClaim(user2.address)).to.equal(ethers.utils.parseEther("7"));
+
+    // preview claim for user3 (should be 0)
+    expect(await rewardsContract.connect(user3).previewClaim(user3.address)).to.equal(0);
+
+    // user1 ETH balance before
+    const user1BalanceBefore = await ethers.provider.getBalance(user1.address);
+    console.log("user1 ETH balance before: ", ethers.utils.formatEther(user1BalanceBefore));
+
+    // user1 receipt token balance before
+    const user1ReceiptTokenBalanceBefore = await rewardsContract.balanceOf(user1.address);
+    console.log("user1 receipt token balance before: ", ethers.utils.formatEther(user1ReceiptTokenBalanceBefore));
+
+    // user1 decides to deposit some more tokens in order to get more rewards
+    await stakingTokenContract.connect(user1).approve(rewardsContract.address, user1tokensToDeposit);
+    await rewardsContract.connect(user1).deposit(user1tokensToDeposit);
+
+    // user1 ETH balance after the deposit (the claim happens automatically, but for the previous deposit balance)
+    const user1BalanceAfter = await ethers.provider.getBalance(user1.address);
+    console.log("user1 ETH balance after: ", ethers.utils.formatEther(user1BalanceAfter));
+    console.log("user1 ETH balance difference: ", ethers.utils.formatEther(user1BalanceAfter.sub(user1BalanceBefore)));
+
+    // user1 receipt token balance after the deposit
+    const user1ReceiptTokenBalanceAfter = await rewardsContract.balanceOf(user1.address);
+    console.log("user1 receipt token balance after: ", ethers.utils.formatEther(user1ReceiptTokenBalanceAfter));
+  });
 });
 
 // Scenario 6: the asset token has a fee-on-transfer mechanism. How does this affect the totalSupply? Is is the same as the contracts asset balance?
