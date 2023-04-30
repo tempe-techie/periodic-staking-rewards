@@ -66,14 +66,14 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
 
   /// @notice Returns the amount of time left (in seconds) until the user can withdraw their assets.
   function getLockedTimeLeft(address _user) external view returns (uint256) {
-    if (lastDeposit[_user] == 0) {
+    uint256 _lastDeposit = lastDeposit[_user];
+
+    if (_lastDeposit == 0) {
       return 0;
     }
 
-    uint256 _timeLeft = lastDeposit[_user] + periodLength - block.timestamp;
-
-    if (_timeLeft > 0) {
-      return _timeLeft;
+    if ((_lastDeposit + periodLength) > block.timestamp) {
+      return _lastDeposit + periodLength - block.timestamp;
     }
 
     return 0;

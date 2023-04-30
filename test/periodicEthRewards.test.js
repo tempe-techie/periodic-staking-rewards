@@ -80,6 +80,10 @@ describe("PeriodicEthRewards", function () {
     const user1tokensToDeposit = ethers.utils.parseEther("300");
     const user2tokensToDeposit = ethers.utils.parseEther("700");
 
+    // get locked time left 1
+    const lockedTimeLeft1 = await rewardsContract.connect(user1).getLockedTimeLeft(user1.address);
+    expect(lockedTimeLeft1).to.equal(0);
+
     // check user1 and user2 staking token balance
     expect(await stakingTokenContract.balanceOf(user1.address)).to.equal(user1stakingTokenBalance);
     expect(await stakingTokenContract.balanceOf(user2.address)).to.equal(user2stakingTokenBalance);
@@ -93,6 +97,11 @@ describe("PeriodicEthRewards", function () {
     // user1 deposits tokens
     await stakingTokenContract.connect(user1).approve(rewardsContract.address, user1tokensToDeposit);
     await rewardsContract.connect(user1).deposit(user1tokensToDeposit);
+
+    // get locked time left 2
+    const lockedTimeLeft2 = await rewardsContract.connect(user1).getLockedTimeLeft(user1.address);
+    console.log("lockedTimeLeft2: ", lockedTimeLeft2.toString());
+    expect(lockedTimeLeft2).to.be.closeTo(claimPeriod, 20); // within 20 seconds
 
     // user2 deposits tokens
     await stakingTokenContract.connect(user2).approve(rewardsContract.address, user2tokensToDeposit);
@@ -119,9 +128,19 @@ describe("PeriodicEthRewards", function () {
     // check rewards contract balance
     expect(await ethers.provider.getBalance(rewardsContract.address)).to.equal(ethers.utils.parseEther("9"));
 
+    // get locked time left 3
+    const lockedTimeLeft3 = await rewardsContract.connect(user1).getLockedTimeLeft(user1.address);
+    console.log("lockedTimeLeft3: ", lockedTimeLeft3.toString());
+    expect(lockedTimeLeft3).to.be.closeTo(claimPeriod, 100); // within 100 seconds
+
     // advance time by 1 week
     await ethers.provider.send("evm_increaseTime", [604801]); // 1 week + 1 second
     await ethers.provider.send("evm_mine");
+
+    // get locked time left 4
+    const lockedTimeLeft4 = await rewardsContract.connect(user1).getLockedTimeLeft(user1.address);
+    console.log("lockedTimeLeft4: ", lockedTimeLeft4.toString());
+    expect(lockedTimeLeft4).to.be.closeTo(0, 10);
 
     // send 1 more ETH to the rewards contract to trigger _updateLastClaimPeriod
     // this ETH will be added to the rewards pool for the previous claim period, so 10 ETH in total (9 ETH + 1 ETH)
@@ -148,6 +167,11 @@ describe("PeriodicEthRewards", function () {
 
     // owner claims rewards for user1 (so that no gas fees are paid by user1)
     await rewardsContract.claimRewardsFor(user1.address);
+
+    // get locked time left 5
+    const lockedTimeLeft5 = await rewardsContract.connect(user1).getLockedTimeLeft(user1.address);
+    console.log("lockedTimeLeft5: ", lockedTimeLeft5.toString());
+    expect(lockedTimeLeft5).to.be.closeTo(0, 10);
 
     // user1 ETH balance after
     const user1BalanceAfter = await ethers.provider.getBalance(user1.address);
@@ -203,6 +227,11 @@ describe("PeriodicEthRewards", function () {
       to: rewardsContract.address 
     });
 
+    // get locked time left 6
+    const lockedTimeLeft6 = await rewardsContract.connect(user1).getLockedTimeLeft(user1.address);
+    console.log("lockedTimeLeft6: ", lockedTimeLeft6.toString());
+    expect(lockedTimeLeft6).to.be.closeTo(0, 10);
+
     // check rewards contract balance
     expect(await ethers.provider.getBalance(rewardsContract.address)).to.equal(ethers.utils.parseEther("18"));
 
@@ -228,6 +257,11 @@ describe("PeriodicEthRewards", function () {
 
     // preview claim for user3 (should be 0)
     expect(await rewardsContract.connect(user3).previewClaim(user3.address)).to.equal(0);
+
+    // get locked time left 7
+    const lockedTimeLeft7 = await rewardsContract.connect(user1).getLockedTimeLeft(user1.address);
+    console.log("lockedTimeLeft7: ", lockedTimeLeft7.toString());
+    expect(lockedTimeLeft7).to.be.closeTo(0, 10);
 
     // user1 ETH balance before
     const user1BalanceBefore2 = await ethers.provider.getBalance(user1.address);
