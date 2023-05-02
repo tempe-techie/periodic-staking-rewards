@@ -1,6 +1,6 @@
 # Periodic Staking Rewards
 
-> Still work-in-progress (WIP)
+> _The contracts have not been audited by a third party. Use at your own risk._
 
 This is a staking smart contract vault that periodically issues ETH rewards to stakers.
 
@@ -129,3 +129,7 @@ Where would that feature come useful? For example in cases where the staking tok
 ## Use at your own risk
 
 The contracts have not been audited by a third party. Use at your own risk.
+
+If you're an auditor who'd like to audit contracts pro-bono, please reach out to me.
+
+For responsible disclosures please reach out to me via Telegram on tempetechie or via email tempe . techie at proton mail . com.
