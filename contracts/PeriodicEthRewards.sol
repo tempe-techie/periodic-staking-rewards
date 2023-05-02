@@ -112,16 +112,21 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
     uint256 _amount
   ) internal override {
     super._beforeTokenTransfer(_from, _to, _amount);
+    require(_to != address(this), "PeriodicEthRewards: cannot transfer to token contract");
 
-    // both claims run if non-zero address transfers to a non-zero address
+    // this does not run on mint or burn, only on transfer
+    if (_from != address(0) && _from != address(0)) {
+      // if sender's assets are locked, they cannot transfer receipt tokens
+      require(block.timestamp > (lastDeposit[_msgSender()] + periodLength), "PeriodicEthRewards: assets are still locked");
+    }
 
+    // this does not run on mint, but it runs on burn or transfer
     if (_from != address(0)) {
-      // this does not run on mint, but it runs on burn
       _claim(_from);
     }
 
-    if (_to != address(0)) {
-      // this does not run on burn, but it runs on mint
+    // this does not run on burn, but it runs on mint or transfer
+    if (_to != address(0)) {  
       _claim(_to);
       // Set lastClaimed to the current timestamp just in case the receiver had no previous claims.
       // This prevents double claiming of rewards, because the sender should have gotten all 

@@ -710,4 +710,63 @@ describe("PeriodicEthRewards", function () {
     console.log("rewards contract staking token balance 3: ", ethers.utils.formatUnits(rewardsContractAssetBalance3, stakingToken3Decimals));
   });
 
+  // Scenario 8: user1 deposits 300 tokens, and then tries to send 100 receipt tokens to user2 and to the receipt token contract (which is also the rewards contract).
+  it("Scenario 8: user1 fails to send 100 locked receipt tokens to user2 and to the rewards contract.", async function() {
+    const user1tokensToDeposit = ethers.utils.parseEther("300");
+
+    // get locked time left 1
+    const lockedTimeLeft1 = await rewardsContract.connect(user1).getLockedTimeLeft(user1.address);
+    expect(lockedTimeLeft1).to.equal(0);
+
+    // check user1 staking token balance
+    expect(await stakingTokenContract.balanceOf(user1.address)).to.equal(user1stakingTokenBalance);
+
+    // user1 deposits tokens
+    await stakingTokenContract.connect(user1).approve(rewardsContract.address, user1tokensToDeposit);
+    await rewardsContract.connect(user1).deposit(user1tokensToDeposit);
+
+    // get locked time left 2
+    const lockedTimeLeft2 = await rewardsContract.connect(user1).getLockedTimeLeft(user1.address);
+    console.log("lockedTimeLeft2: ", lockedTimeLeft2.toString());
+    expect(lockedTimeLeft2).to.be.closeTo(claimPeriod, 20); // within 20 seconds
+
+    // check user1 receipt token balance
+    expect(await rewardsContract.balanceOf(user1.address)).to.equal(user1tokensToDeposit);
+
+    // revert: user1 fails to send 100 receipt tokens to user2 ("PeriodicEthRewards: assets are still locked")
+    await expect(rewardsContract.connect(user1).transfer(
+      user2.address, ethers.utils.parseEther("100"))
+    ).to.be.revertedWith("PeriodicEthRewards: assets are still locked");
+
+    // check user1 receipt token balance
+    expect(await rewardsContract.balanceOf(user1.address)).to.equal(ethers.utils.parseEther("300"));
+
+    // revert: user 1 fails to send 100 receipt tokens to the rewards contract ("PeriodicEthRewards: cannot transfer to token contract")
+    await expect(rewardsContract.connect(user1).transfer(
+      rewardsContract.address, ethers.utils.parseEther("100"))
+    ).to.be.revertedWith("PeriodicEthRewards: cannot transfer to token contract");
+
+    // user1 makes another deposit
+    await stakingTokenContract.connect(user1).approve(rewardsContract.address, user1tokensToDeposit);
+    await rewardsContract.connect(user1).deposit(user1tokensToDeposit);
+
+    // check user1 receipt token balance
+    expect(await rewardsContract.balanceOf(user1.address)).to.equal(ethers.utils.parseEther("600"));
+
+    // wait for the claim period to end (tokens are not locked anymore)
+    await ethers.provider.send("evm_increaseTime", [Number(claimPeriod)+1]); // 1 week
+    await ethers.provider.send("evm_mine");
+
+    // user1 sends 100 receipt tokens to user2 (succeeds because tokens are not locked anymore)
+    await rewardsContract.connect(user1).transfer(
+      user2.address, ethers.utils.parseEther("100")
+    );
+
+    // check user1 receipt token balance
+    expect(await rewardsContract.balanceOf(user1.address)).to.equal(ethers.utils.parseEther("500"));
+
+    // check user2 receipt token balance
+    expect(await rewardsContract.balanceOf(user2.address)).to.equal(ethers.utils.parseEther("100"));
+  });
+
 });
