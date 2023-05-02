@@ -39,11 +39,91 @@ That's why in this contract the message sender can only deposit or withdraw for 
 function deposit(uint256 assets) external returns (uint256)
 ```
 
+## Audit tools
+
+### Flatten the contracts
+
+Most audit tools will require you to flatten the contracts. This means that all contracts that are defined under the imports will actually be imported into one .sol file, so all code is in one place.
+
+First create a new folder called flattened:
+
+```bash
+mkdir flattened
+```
+
+To flatten a contract, run this command:
+
+```bash
+npx hardhat flatten PeriodicEthRewards.sol >> flattened/PeriodicEthRewards.sol
+```
+
+> Important: You will need to delete all SPDX lines except the very first one from the flattened contract.
+
+### Mythril
+
+Use Docker:
+
+```bash
+sudo docker pull mythril/myth
+```
+
+Go to the `flattened` folder and run this command:
+
+```bash
+sudo docker run -v $(pwd):/tmp mythril/myth -v4 analyze /tmp/PeriodicEthRewards.sol --max-depth 10
+```
+
+Or, if you don't use Docker, use this command alone:
+
+```bash
+myth -v4 analyze flattened/PeriodicEthRewards.sol --max-depth 10
+```
+
+Flags:
+
+- `v4`: verbose
+- `o`: output
+- `a`: address onchain
+- `l`: automatically retrieve dependencies
+- `max-depth`: maximum recursion depth
+
+Docs: https://mythril-classic.readthedocs.io/en/master/security-analysis.html 
+
+### Slither
+
+Install Slither:
+
+```bash
+pip3 install slither-analyzer --user
+```
+
+Run it in the `flattened` folder:
+
+```bash
+slither .
+```
+
+Docs: https://github.com/crytic/slither
+
+## Debugging
+
+### Error: ENOENT: no such file or directory
+
+Run `npx hardhat clean` and then `npx hardhat compile`.
+
 ## Other notes
 
 ### Tokens with less than 18 decimals
 
 Tokens with less than 18 decimals seem to work without any issue as asset tokens, but it may still make more sense to only use tokens with 18 decimals as staking/asset tokens - just in case there's an edge case issue that hasn't been caught.
+
+### Variation: Forever locked stake (idea)
+
+> Note that this is not part of the staking smart contracts in this repository, it's just an idea.
+
+An interesting variation of the existing smart contracts would be to disable withdrawals. This could be achieved by deleting the withdrawal function or to implement a `withdrawalsDisabled` variable that owner could turn on or off.
+
+Where would that feature come useful? For example in cases where the staking token is an LP token. So effectively a liquidity could be locked forever while LPs would still receive staking rewards for the liquidity they provided. And they could still transfer or trade the "receipt" tokens.
 
 ## Use at your own risk
 

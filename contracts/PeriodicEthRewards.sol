@@ -37,6 +37,11 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
     uint256 _minDeposit,
     uint256 _periodLength
   ) ERC20(_receiptTokenName, _receiptTokenSymbol) {
+    require(_asset != address(0), "PeriodicEthRewards: asset is the zero address");
+    require(_periodLength > 0, "PeriodicEthRewards: period length is zero");
+    require(bytes(_receiptTokenName).length > 0, "PeriodicEthRewards: receipt token name is empty");
+    require(bytes(_receiptTokenSymbol).length > 0, "PeriodicEthRewards: receipt token symbol is empty");
+
     asset = _asset;
     
     claimRewardsMinimum = _claimRewardsMinimum;
@@ -69,6 +74,7 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
     uint256 _lastDeposit = lastDeposit[_user];
 
     if (_lastDeposit == 0) {
+      // in case periodLength is bigger than block.timestamp
       return 0;
     }
 
@@ -191,7 +197,9 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
 
     lastDeposit[_msgSender()] = block.timestamp; // after deposit withdrawals are disabled for periodLength
 
-    ERC20(asset).transferFrom(_msgSender(), address(this), _assets); // transfer staking tokens to this contract
+    bool transferSuccess = ERC20(asset).transferFrom(_msgSender(), address(this), _assets); // transfer staking tokens to this contract
+    require(transferSuccess, "PeriodicEthRewards: ERC20 deposit transfer failed");
+    
     _mint(_msgSender(), _assets); // mint receipt tokens
 
     emit Deposit(_msgSender(), _assets);
@@ -221,7 +229,9 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
     }
 
     _burn(_msgSender(), _assets); // burn receipt tokens
-    ERC20(asset).transfer(_msgSender(), _assets); // receive back the asset tokens (staking tokens)
+
+    bool transferSuccess = ERC20(asset).transfer(_msgSender(), _assets); // receive back the asset tokens (staking tokens)
+    require(transferSuccess, "PeriodicEthRewards: ERC20 withdraw transfer failed");
 
     // note: if user withdraws all staked tokens, they forfeit their claim for the current 
     // staking period (unless they deposit again)
@@ -238,7 +248,7 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
     require(_tokenAddress != asset, "PeriodicEthRewards: cannot recover staking token");
     require(_tokenAddress != address(this), "PeriodicEthRewards: cannot recover receipt token");
 
-    ERC20(_tokenAddress).transfer(_recipient, _tokenAmount);
+    require(ERC20(_tokenAddress).transfer(_recipient, _tokenAmount), "PeriodicEthRewards: ERC20 recover failed");
 
     emit OwnerRecoverErc20(_msgSender(), _tokenAddress, _tokenAmount);
   }
