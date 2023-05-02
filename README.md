@@ -126,6 +126,29 @@ An interesting variation of the existing smart contracts would be to disable wit
 
 Where would that feature come useful? For example in cases where the staking token is an LP token. So effectively a liquidity could be locked forever while LPs would still receive staking rewards for the liquidity they provided. And they could still transfer or trade the "receipt" tokens.
 
+### ERC20Permit (EIP-2612)
+
+If you need the `permit()` function, import and implement ERC20Permit from Open Zeppelin like this:
+
+```solidity
+import { ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
+
+// ...
+
+contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard, ERC20Permit
+
+// ...
+
+  constructor(
+    address _asset,
+    string memory _receiptTokenName,
+    string memory _receiptTokenSymbol,
+    uint256 _claimRewardsMinimum,
+    uint256 _minDeposit,
+    uint256 _periodLength
+  ) ERC20(_receiptTokenName, _receiptTokenSymbol) ERC20Permit(_receiptTokenName) {
+```
+
 ## Use at your own risk
 
 The contracts have not been audited by a third party. Use at your own risk.
