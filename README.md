@@ -57,7 +57,7 @@ To flatten a contract, run this command:
 npx hardhat flatten PeriodicEthRewards.sol >> flattened/PeriodicEthRewards.sol
 ```
 
-> Important: You will need to delete all SPDX lines except the very first one from the flattened contract.
+> Important: You will need to delete all SPDX lines except the very first one from the flattened contract. You may also need to change solidity versions for the contract to work well with Mythril, or to use flags to specify a different solidity version (check Mythril docs).
 
 ### Mythril
 
@@ -76,7 +76,7 @@ sudo docker run -v $(pwd):/tmp mythril/myth -v4 analyze /tmp/PeriodicEthRewards.
 Or, if you don't use Docker, use this command alone:
 
 ```bash
-myth -v4 analyze flattened/PeriodicEthRewards.sol --max-depth 10
+myth -v4 analyze flattened/PeriodicEthRewards.sol -t 4 --max-depth 10
 ```
 
 Flags:
@@ -85,6 +85,7 @@ Flags:
 - `o`: output
 - `a`: address onchain
 - `l`: automatically retrieve dependencies
+- `t`: number of transactions (default is 3)
 - `max-depth`: maximum recursion depth
 
 Docs: https://mythril-classic.readthedocs.io/en/master/security-analysis.html 
