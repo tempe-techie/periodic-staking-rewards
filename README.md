@@ -13,10 +13,6 @@ Actions:
 - Deposit (& Lock & Claim)
 - Withdraw (& Claim)
 
-TODO:
-- Self-auditing using Slither, Mythril, etc.
-- Testnet deployment with frontend
-
 ## Limitations
 
 ### Rebasing tokens are not supported

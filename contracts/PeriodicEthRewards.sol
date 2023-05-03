@@ -88,7 +88,7 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   /// @notice Returns the amount of ETH that can be claimed for a given user
   function previewClaim(address _claimer) public view returns (uint256) {
     if (lastClaimed[_claimer] < lastClaimPeriod && totalSupply() > 0) {
-      return claimRewardsTotal * balanceOf(_claimer) / totalSupply(); // get ETH claim for a given user
+      return claimRewardsTotal * balanceOf(_claimer) / totalSupply(); // get current ETH claim for a given user
     }
 
     return 0;
@@ -116,8 +116,8 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
 
     // this does not run on mint or burn, only on transfer
     if (_from != address(0) && _from != address(0)) {
-      // if sender's assets are locked, they cannot transfer receipt tokens
-      require(block.timestamp > (lastDeposit[_msgSender()] + periodLength), "PeriodicEthRewards: assets are still locked");
+      // if sender's assets are locked, receipt tokens cannot be transferred
+      require(block.timestamp > (lastDeposit[_from] + periodLength), "PeriodicEthRewards: assets are still locked");
     }
 
     // this does not run on mint, but it runs on burn or transfer
@@ -166,7 +166,8 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
         claimRewardsTotal = address(this).balance;
         futureRewards = 0; // reset future rewards to 0
       } else {
-        claimRewardsTotal = 0; // if minimum not reached, no one can claim. All ETH rewards go into the next period
+        // if minimum not reached, no one can claim. All ETH rewards go into the next period
+        claimRewardsTotal = 0;
         futureRewards = address(this).balance; // set future rewards to the current balance
       } 
 
