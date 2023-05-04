@@ -214,7 +214,7 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   }
 
   /// @notice Manually update the last claim period (if needed). Anyone can call this function.
-  function updateLastClaimPeriod() external {
+  function updateLastClaimPeriod() external nonReentrant {
     // it's better to call _claim() instead of _updateLastClaimPeriod() in case user has forgotten to claim
     // _claim() will call _updateLastClaimPeriod() anyway
     _claim(_msgSender());
