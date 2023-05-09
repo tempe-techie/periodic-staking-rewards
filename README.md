@@ -145,6 +145,10 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard, ERC20Permit
   ) ERC20(_receiptTokenName, _receiptTokenSymbol) ERC20Permit(_receiptTokenName) {
 ```
 
+## Thanks
+
+A big thanks to @Whynot63 and @trmid for providing valuable feedback.
+
 ## Use at your own risk
 
 The contracts have not been audited by a third party. Use at your own risk.
