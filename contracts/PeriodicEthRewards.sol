@@ -58,10 +58,10 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
     asset = _asset;
     
     claimRewardsMinimum = _claimRewardsMinimum;
-    emit OwnerClaimRewardsMinimumSet(_msgSender(), _claimRewardsMinimum);
+    emit OwnerClaimRewardsMinimumSet(msg.sender, _claimRewardsMinimum);
 
     minDeposit = _minDeposit;
-    emit OwnerMinDepositSet(_msgSender(), _minDeposit);
+    emit OwnerMinDepositSet(msg.sender, _minDeposit);
 
     periodLength = _periodLength;
 
@@ -118,7 +118,7 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
 
   /// @notice Claim ETH rewards for yourself.
   function claimRewards() external nonReentrant returns (uint256) {
-    return _claim(_msgSender()); // returns the amount of ETH claimed
+    return _claim(msg.sender); // returns the amount of ETH claimed
   }
 
   /// @notice Claim ETH rewards for someone else.
@@ -131,13 +131,13 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
     require(_assets <= maxDeposit, "PeriodicEthRewards: deposit is more than max");
     require(_assets >= minDeposit, "PeriodicEthRewards: deposit is less than min");
 
-    lastDeposit[_msgSender()] = block.timestamp; // after deposit withdrawals are disabled for periodLength
+    lastDeposit[msg.sender] = block.timestamp; // after deposit withdrawals are disabled for periodLength
 
-    IERC20(asset).safeTransferFrom(_msgSender(), address(this), _assets); // transfer staking tokens to this contract
+    IERC20(asset).safeTransferFrom(msg.sender, address(this), _assets); // transfer staking tokens to this contract
     
-    _mint(_msgSender(), _assets); // mint receipt tokens
+    _mint(msg.sender, _assets); // mint receipt tokens
 
-    emit Deposit(_msgSender(), _assets);
+    emit Deposit(msg.sender, _assets);
 
     return _assets;
   }
@@ -146,16 +146,16 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   function updateLastClaimPeriod() external nonReentrant {
     // it's better to call _claim() instead of _updateLastClaimPeriod() in case user has forgotten to claim
     // _claim() will call _updateLastClaimPeriod() anyway
-    _claim(_msgSender());
+    _claim(msg.sender);
   }
 
   /// @notice Withdraw assets and burn receipt tokens.
   function withdraw(uint256 _assets) external nonReentrant returns (uint256) {
-    uint _balance = balanceOf(_msgSender());
+    uint _balance = balanceOf(msg.sender);
 
     require(_assets > 0, "PeriodicEthRewards: cannot withdraw 0");
     require(_assets <= _balance, "PeriodicEthRewards: cannot withdraw more than balance");
-    require(block.timestamp > (lastDeposit[_msgSender()] + periodLength), "PeriodicEthRewards: assets are still locked");
+    require(block.timestamp > (lastDeposit[msg.sender] + periodLength), "PeriodicEthRewards: assets are still locked");
 
     // if not full withdraw, require balance to stay at least the min user deposit amount
     if (_balance > _assets) {
@@ -165,14 +165,14 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
       );
     }
 
-    _burn(_msgSender(), _assets); // burn receipt tokens
+    _burn(msg.sender, _assets); // burn receipt tokens
 
-    IERC20(asset).safeTransfer(_msgSender(), _assets); // receive back the asset tokens (staking tokens)
+    IERC20(asset).safeTransfer(msg.sender, _assets); // receive back the asset tokens (staking tokens)
 
     // note: if user withdraws all staked tokens, they forfeit their claim for the current 
     // staking period (unless they deposit again)
 
-    emit Withdraw(_msgSender(), _assets);
+    emit Withdraw(msg.sender, _assets);
 
     return _assets;
   }
@@ -186,7 +186,7 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
 
     IERC20(_tokenAddress).safeTransfer(_recipient, _tokenAmount);
 
-    emit OwnerRecoverErc20(_msgSender(), _tokenAddress, _tokenAmount);
+    emit OwnerRecoverErc20(msg.sender, _tokenAddress, _tokenAmount);
   }
 
   /** 
@@ -196,19 +196,19 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
   */
   function setClaimRewardsMinimum(uint256 _claimRewardsMinimum) external onlyOwner {
     claimRewardsMinimum = _claimRewardsMinimum;
-    emit OwnerClaimRewardsMinimumSet(_msgSender(), _claimRewardsMinimum);
+    emit OwnerClaimRewardsMinimumSet(msg.sender, _claimRewardsMinimum);
   }
 
   /// @notice Sets the maximum amount of assets that a user can deposit at once.
   function setMaxDeposit(uint256 _maxDeposit) external onlyOwner {
     maxDeposit = _maxDeposit;
-    emit OwnerMaxDepositSet(_msgSender(), _maxDeposit);
+    emit OwnerMaxDepositSet(msg.sender, _maxDeposit);
   }
 
   /// @notice Sets the minimum amount of assets that a user can deposit.
   function setMinDeposit(uint256 _minDeposit) external onlyOwner {
     minDeposit = _minDeposit;
-    emit OwnerMinDepositSet(_msgSender(), _minDeposit);
+    emit OwnerMinDepositSet(msg.sender, _minDeposit);
   }
 
   // INTERNAL
@@ -256,7 +256,7 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
       (bool _success, ) = payable(_claimer).call{value: _ethToClaim}("");
       require(_success, "ETH transfer failed");
 
-      emit Claim(_msgSender(), _claimer, _ethToClaim);
+      emit Claim(msg.sender, _claimer, _ethToClaim);
     }
 
     _updateLastClaimPeriod();
@@ -278,7 +278,7 @@ contract PeriodicEthRewards is ERC20, Ownable, ReentrancyGuard {
         futureRewards = address(this).balance; // set future rewards to the current balance
       } 
 
-      emit LastClaimPeriodUpdate(_msgSender(), block.timestamp, claimRewardsTotal, futureRewards);
+      emit LastClaimPeriodUpdate(msg.sender, block.timestamp, claimRewardsTotal, futureRewards);
     }
   }
 
