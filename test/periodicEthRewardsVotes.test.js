@@ -1,4 +1,4 @@
-// npx hardhat test test/periodicEthRewards.test.js
+// npx hardhat test test/periodicEthRewardsVotes.test.js
 
 const { expect } = require("chai");
 
@@ -18,7 +18,7 @@ function calculateGasCosts(testName, receipt) {
   console.log(testName + " gas cost (Polygon): $" + String(Number(gasCostMatic)*matic));
 }
 
-describe("PeriodicEthRewards", function () {
+describe("PeriodicEthRewardsVotes (with ERC20Votes and ERC20Permit)", function () {
   let rewardsContract;
   let rewardsContract2; // using staking token with transfer fee as asset token
   let rewardsContract3; // using staking token with 10 decimals
@@ -58,7 +58,7 @@ describe("PeriodicEthRewards", function () {
     stakingTokenContract3 = await MockErc20TokenWithCustomDecimals.deploy("Staking Token with 10 decimals", "STAX", stakingToken3Decimals);
     await stakingTokenContract3.deployed();
 
-    PeriodicEthRewards = await ethers.getContractFactory("PeriodicEthRewards");
+    PeriodicEthRewards = await ethers.getContractFactory("PeriodicEthRewardsVotes");
     rewardsContract = await PeriodicEthRewards.deploy(
       stakingTokenContract.address,
       "Receipt Token",

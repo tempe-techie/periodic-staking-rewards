@@ -124,7 +124,9 @@ Where would that feature come useful? For example in cases where the staking tok
 
 ### ERC20Permit (EIP-2612)
 
-If you need the `permit()` function, import and implement ERC20Permit from Open Zeppelin like this:
+See the `PeriodicEthRewardsVotes.sol` smart contract which has both `ERC20Permit` and `ERC20Votes` implemented.
+
+If you need only the `permit()` function (and no ERC20Votes functionality), import and implement ERC20Permit from Open Zeppelin like this:
 
 ```solidity
 import { ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
