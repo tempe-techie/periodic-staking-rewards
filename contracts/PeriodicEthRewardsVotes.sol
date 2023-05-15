@@ -81,6 +81,16 @@ contract PeriodicEthRewardsVotes is ERC20, Ownable, ReentrancyGuard, ERC20Votes 
 
   // READ
 
+  // Overrides IERC6372 functions to make the token & governor timestamp-based
+  function clock() public view override returns (uint48) {
+    return uint48(block.timestamp);
+  }
+
+  // Overrides IERC6372 functions to make the token & governor timestamp-based
+  function CLOCK_MODE() public pure override returns (string memory) { // solhint-disable-line func-name-mixedcase
+    return "mode=timestamp";
+  }
+
   /// @notice Returns the amount of time left (in seconds) until the user can withdraw their assets.
   function getLockedTimeLeft(address _user) external view returns (uint256) {
     uint256 _lastDeposit = lastDeposit[_user];
