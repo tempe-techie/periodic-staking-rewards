@@ -129,7 +129,7 @@ See the `PeriodicEthRewardsVotes.sol` smart contract which has both `ERC20Permit
 If you need only the `permit()` function (and no ERC20Votes functionality), import and implement ERC20Permit from Open Zeppelin like this:
 
 ```solidity
-import { ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/draft-ERC20Permit.sol";
+import { ERC20Permit } from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 
 // ...
 
