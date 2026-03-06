@@ -242,7 +242,7 @@ contract PeriodicEthRewardsVotes is ERC20, Ownable, ReentrancyGuard, ERC20Votes 
     require(_to != address(this), "PeriodicEthRewards: cannot transfer to token contract");
 
     // this does not run on mint or burn, only on transfer
-    if (_from != address(0) && _from != address(0)) {
+    if (_from != address(0) && _to != address(0)) {
       // if sender's assets are locked, receipt tokens cannot be transferred
       require(block.timestamp > (lastDeposit[_from] + periodLength), "PeriodicEthRewards: assets are still locked");
     }
